@@ -1,0 +1,323 @@
+PRD + Technical Specification
+
+Inventory Dashboard Web Application (Google Sheets Source)
+
+⸻
+
+1. Product Overview
+
+Product Name
+
+Inventory Dashboard
+
+Description
+
+A web application that reads daily inventory data from Google Sheets, extracts Stock, In, and Out values per Product + Size + Date, and visualizes the data through interactive charts.
+
+The application is read-only, loads the latest data on every page refresh, and supports PDF export of the displayed charts.
+
+⸻
+
+2. Goals & Success Criteria
+
+Goals
+	•	Provide clear visual insight into inventory movement
+	•	Eliminate manual reporting
+	•	Stay aligned with existing manual Google Sheets workflow
+	•	Be simple, fast, and reliable
+
+Success Criteria
+	•	Correctly reads data from the Inventory Daily sheet
+	•	Stock is interpreted as opening balance
+	•	Filters (product / size / date) work correctly
+	•	Data refresh reflects latest Google Sheets content
+	•	Charts export cleanly to PDF
+
+⸻
+
+3. Scope Definition
+
+In Scope
+	•	Read data from Google Sheets (read-only)
+	•	Parse one fixed template
+	•	Interactive dashboard charts
+	•	Product / size / date filtering
+	•	PDF export of charts
+
+Out of Scope
+	•	Writing back to Google Sheets
+	•	Multiple templates or sheets
+	•	Auto-recalculation of stock
+	•	User authentication
+	•	Live push updates (WebSocket, etc.)
+
+⸻
+
+4. Source Data Specification (Fixed Rules)
+
+4.1 Google Sheet
+	•	Spreadsheet source: Google Sheets
+	•	Sheet name: Inventory Daily (hard-coded)
+	•	Only one sheet is supported
+
+⸻
+
+4.2 Date Column
+	•	Column A
+	•	Format: MM/DD/YY
+	•	Always consistent
+
+⸻
+
+4.3 Header Structure (Three-Level Header)
+
+Row	Meaning
+Row 1	Product name
+Row 2	Size
+Row 3	Metric
+
+Supported Sizes (FIXED)
+
+S, M, L, XL, XXL
+
+Metrics
+
+Stock | In | Out
+
+No additional sizes or metrics are supported.
+
+⸻
+
+5. Business Logic Rules (CRITICAL)
+
+5.1 Stock Definition
+	•	Stock = opening balance of the day
+	•	Stock is manually entered
+	•	Stock is not auto-calculated
+
+⸻
+
+5.2 In / Out Values
+	•	Empty cell = 0
+	•	No transaction = 0
+
+⸻
+
+5.3 Missing Stock
+	•	Stock may not be filled every day
+	•	If stock is missing:
+	•	Value = null
+	•	Stock chart shows a gap
+	•	This is not an error
+
+⸻
+
+5.4 Invalid Stock
+	•	Stock value < 0:
+	•	Considered invalid input
+	•	Ignored completely
+	•	Not used in charts or calculations
+	•	Flagged as a data issue
+
+⸻
+
+6. Data Parsing Rules
+
+6.1 Row Parsing Logic
+
+For each date row:
+	•	Parse date from column A
+	•	For each product + size:
+	•	Stock:
+	•	≥ 0 → valid
+	•	empty → null
+	•	< 0 → invalid
+	•	In:
+	•	empty → 0
+	•	Out:
+	•	empty → 0
+
+⸻
+
+6.2 Header Mapping
+
+The application must create a mapping:
+
+Column Index → { product, size, metric }
+
+If the header structure does not match the expected template:
+	•	Stop processing
+	•	Display error: Invalid sheet format
+
+⸻
+
+7. Derived Logic (Validation Only)
+
+Validation only — no data mutation
+
+Optional validation rule:
+
+ExpectedStock(today) =
+  Stock(yesterday) + In(yesterday) - Out(yesterday)
+
+If mismatch detected:
+	•	Display a warning (non-blocking)
+	•	Do NOT auto-fix
+
+⸻
+
+8. Functional Features
+
+8.1 Google Sheets Integration
+	•	Access mode: Read-only
+	•	Data fetch:
+	•	On page load
+	•	On manual refresh
+	•	Realtime definition:
+	•	Reload page = load latest data
+	•	No background polling required
+
+⸻
+
+8.2 Filters
+
+User can filter by:
+	•	Product:
+	•	All products (default)
+	•	Single product
+	•	Size:
+	•	All sizes (default)
+	•	Single size
+	•	Date range:
+	•	Default: full data range
+
+Supported combinations:
+	•	Product only
+	•	Product + Size
+
+⸻
+
+9. Charts
+
+9.1 Line Chart — Stock Over Time
+	•	X-axis: Date
+	•	Y-axis: Stock (opening balance)
+	•	Missing stock → gap
+	•	Invalid stock → hidden
+	•	Size = All → multi-line chart (one line per size)
+
+⸻
+
+9.2 Bar Chart — In vs Out
+	•	Grouped bars per date
+	•	Both values shown as positive
+	•	Missing values = 0
+
+⸻
+
+9.3 Summary Chart — Total Stock
+	•	Uses the latest valid stock value
+	•	Breakdown by size
+	•	Bar chart or pie chart
+
+⸻
+
+10. PDF Export
+	•	Export current dashboard view
+	•	PDF includes:
+	•	Title
+	•	Export timestamp
+	•	Active filters
+	•	Visible charts
+	•	Format:
+	•	A4
+	•	Landscape orientation
+
+⸻
+
+11. UI / UX Requirements
+	•	Single-page dashboard
+	•	Filter panel at the top
+	•	Chart area below filters
+	•	Warning badge for data issues
+	•	No inline editing
+
+⸻
+
+12. Technical Specification
+
+12.1 Architecture
+	•	Frontend-centric application
+	•	Optional backend as Google Sheets API proxy
+	•	Stateless design
+
+⸻
+
+12.2 Suggested Technology Stack
+
+(Recommendation, not mandatory)
+	•	Frontend:
+	•	React / Next.js
+	•	Charts:
+	•	Recharts / Chart.js / Apache ECharts
+	•	Data Access:
+	•	Google Sheets API v4
+	•	PDF Export:
+	•	jsPDF / html2pdf / Puppeteer (server-side)
+
+⸻
+
+12.3 Internal Data Model
+
+type InventoryRecord = {
+  date: string; // ISO format
+  product: string;
+  size: "S" | "M" | "L" | "XL" | "XXL";
+  stock: number | null;
+  in: number;
+  out: number;
+  validStock: boolean;
+};
+
+
+⸻
+
+12.4 Error Handling
+
+Handled cases:
+	•	Sheet not found
+	•	Header mismatch
+	•	Invalid numeric values
+	•	Network failure
+
+Behavior:
+	•	Display clear user-friendly error
+	•	Do not crash the application
+
+⸻
+
+13. Performance Requirements
+	•	≤ 3 seconds load time for ~5,000 rows
+	•	Client-side parsing
+	•	Instant chart updates on filter change
+
+⸻
+
+14. Acceptance Criteria
+	•	Reads from Inventory Daily
+	•	Stock treated as opening balance
+	•	Empty In/Out treated as zero
+	•	Negative stock ignored
+	•	Filters work correctly
+	•	Charts selectable
+	•	PDF export works
+	•	Page reload fetches latest data
+
+⸻
+
+15. Explicit Non-Goals
+	•	❌ Automatic stock calculation
+	•	❌ Write-back to Google Sheets
+	•	❌ Dynamic sizes
+	•	❌ Multiple templates
+	•	❌ Push-based realtime updates
