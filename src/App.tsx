@@ -7,6 +7,7 @@ import StockTrendChart from './components/Charts/StockTrendChart';
 import InOutChart from './components/Charts/InOutChart';
 import TopSalesTable from './components/Dashboard/TopSalesTable';
 import SalesForecastChart from './components/Charts/SalesForecastChart';
+import StockDepletionChart from './components/Charts/StockDepletionChart';
 import type { Size } from './types/inventory';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -196,6 +197,55 @@ function App() {
     return combinedData;
   }, [filteredData, selectedProduct, productMetadata]);
 
+  const stockDepletionData = useMemo(() => {
+    if (selectedProduct === 'All') return [];
+
+    const metadata = productMetadata[selectedProduct];
+    let targetDaily = 0;
+    let minStockTotal = 0;
+
+    if (metadata) {
+      if (selectedSize === 'All') {
+        targetDaily = Object.values(metadata).reduce((sum, m) => sum + m.targetSalesDaily, 0);
+        minStockTotal = Object.values(metadata).reduce((sum, m) => sum + m.minStock, 0);
+      } else {
+        targetDaily = metadata[selectedSize]?.targetSalesDaily || 0;
+        minStockTotal = metadata[selectedSize]?.minStock || 0;
+      }
+    }
+
+    if (targetDaily <= 0) return [];
+
+    // Current stock: sum of stock for selected product/size on the latest date
+    const latestDate = dateRange.max;
+    const currentStock = filteredData
+      .filter(r => r.date === latestDate)
+      .reduce((sum, r) => sum + (r.stock || 0), 0);
+
+    const dataPoints: any[] = [];
+    let projectedStock = currentStock;
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0, 0);
+
+    // Project up to 60 days
+    for (let i = 0; i <= 60; i++) {
+      const d = new Date(startDate);
+      d.setDate(startDate.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+
+      dataPoints.push({
+        date: dateStr,
+        stock: Math.max(0, projectedStock),
+        minStock: minStockTotal
+      });
+
+      projectedStock -= targetDaily;
+      if (projectedStock < -targetDaily * 5) break; // Stop a bit after hitting 0
+    }
+
+    return dataPoints;
+  }, [filteredData, selectedProduct, selectedSize, productMetadata, dateRange]);
+
   if (error) {
     return (
       <div className="dashboard-container flex items-center justify-center" style={{ height: '100vh' }}>
@@ -252,7 +302,10 @@ function App() {
         </div>
         <InOutChart data={inOutData} />
         {selectedProduct !== 'All' && (
-          <SalesForecastChart data={forecastData} productName={selectedProduct} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <SalesForecastChart data={forecastData} productName={selectedProduct} />
+            <StockDepletionChart data={stockDepletionData} productName={selectedProduct} />
+          </div>
         )}
       </div>
 
