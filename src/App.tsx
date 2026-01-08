@@ -254,20 +254,24 @@ function App() {
       />
 
       <div className="chart-grid">
-        <StockTrendChart
-          data={trendData}
-          sizes={selectedSize === 'All' ? ['S', 'M', 'L', 'XL', 'XXL'] : [selectedSize]}
-          metric={selectedMetric}
-          onMetricChange={setSelectedMetric}
-          minStock={currentMinStock}
-        />
-        <div className="chart-full">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <TopSalesTable data={topSalesData} />
+          <StockTrendChart
+            data={trendData}
+            sizes={selectedSize === 'All' ? ['S', 'M', 'L', 'XL', 'XXL'] : [selectedSize]}
+            metric={selectedMetric}
+            onMetricChange={setSelectedMetric}
+            minStock={currentMinStock}
+          />
         </div>
-        <InOutChart data={inOutData} />
+
         {selectedProduct !== 'All' && (
-          <UnifiedForecastChart data={unifiedForecastData} productName={selectedProduct} />
+          <div className="mb-8">
+            <UnifiedForecastChart data={unifiedForecastData} productName={selectedProduct} />
+          </div>
         )}
+
+        <InOutChart data={inOutData} />
       </div>
 
       <footer className="mt-8 text-center text-secondary text-sm">
