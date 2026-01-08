@@ -6,13 +6,14 @@ import SummaryCards from './components/Dashboard/SummaryCards';
 import StockTrendChart from './components/Charts/StockTrendChart';
 import InOutChart from './components/Charts/InOutChart';
 import TopSalesTable from './components/Dashboard/TopSalesTable';
+import SalesForecastChart from './components/Charts/SalesForecastChart';
 import type { Size } from './types/inventory';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import './styles/index.css';
 
 function App() {
-  const { data, minStockData, loading, error, products, dateRange, refresh } = useInventoryData();
+  const { data, productMetadata, loading, error, products, dateRange, refresh } = useInventoryData();
   const dashboardRef = useRef<HTMLDivElement>(null);
 
   const [selectedProduct, setSelectedProduct] = useState('All');
@@ -132,8 +133,66 @@ function App() {
 
   const currentMinStock = useMemo(() => {
     if (selectedProduct === 'All') return undefined;
-    return minStockData[selectedProduct];
-  }, [selectedProduct, minStockData]);
+    return productMetadata[selectedProduct]?.minStock;
+  }, [selectedProduct, productMetadata]);
+
+  const forecastData = useMemo(() => {
+    if (selectedProduct === 'All') return [];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const oneMonthAgo = new Date(today);
+    oneMonthAgo.setMonth(today.getMonth() - 1);
+
+    const oneMonthAhead = new Date(today);
+    oneMonthAhead.setMonth(today.getMonth() + 1);
+
+    const targetDaily = productMetadata[selectedProduct]?.targetSalesDaily || 0;
+
+    // 1. Past Sales Data
+    const pastSalesMap: Record<string, number> = {};
+    filteredData.forEach(r => {
+      const d = new Date(r.date);
+      if (d >= oneMonthAgo && d <= today) {
+        pastSalesMap[r.date] = (pastSalesMap[r.date] || 0) + r.out;
+      }
+    });
+
+    const combinedData: any[] = [];
+
+    // Fill past days
+    for (let d = new Date(oneMonthAgo); d <= today; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      combinedData.push({
+        date: dateStr,
+        actual: pastSalesMap[dateStr] || 0,
+        forecast: undefined
+      });
+    }
+
+    // Connect last actual point to first forecast point for visual continuity
+    const lastPastPoint = combinedData[combinedData.length - 1];
+    if (lastPastPoint) {
+      // We'll set the forecast for the today's point as well so the line attaches
+      lastPastPoint.forecast = targetDaily;
+    }
+
+    // 2. Future Forecast Data
+    for (let d = new Date(today); d <= oneMonthAhead; d.setDate(d.getDate() + 1)) {
+      // Skip today if we already added it, or just start from tomorrow
+      if (d.getTime() === today.getTime()) continue;
+
+      const dateStr = d.toISOString().split('T')[0];
+      combinedData.push({
+        date: dateStr,
+        actual: undefined,
+        forecast: targetDaily
+      });
+    }
+
+    return combinedData;
+  }, [filteredData, selectedProduct, productMetadata]);
 
   if (error) {
     return (
@@ -190,6 +249,9 @@ function App() {
           <TopSalesTable data={topSalesData} />
         </div>
         <InOutChart data={inOutData} />
+        {selectedProduct !== 'All' && (
+          <SalesForecastChart data={forecastData} productName={selectedProduct} />
+        )}
       </div>
 
       <footer className="mt-8 text-center text-secondary text-sm">

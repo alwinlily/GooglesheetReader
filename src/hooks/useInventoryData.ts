@@ -3,9 +3,14 @@ import type { InventoryRecord } from "../types/inventory";
 import { parseGoogleSheetsData } from "../utils/dataParser";
 import { MOCK_SHEET_DATA } from "../utils/mockData";
 
+export interface ProductMetadata {
+    minStock: number;
+    targetSalesDaily: number;
+}
+
 export function useInventoryData() {
     const [data, setData] = useState<InventoryRecord[]>([]);
-    const [minStockData, setMinStockData] = useState<Record<string, number>>({});
+    const [productMetadata, setProductMetadata] = useState<Record<string, ProductMetadata>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +31,7 @@ export function useInventoryData() {
             }
 
             const dailyRange = "dummy!A1:ZZ1000";
-            const masterRange = "Inventory_Master!A1:G100";
+            const masterRange = "Inventory_Master!A1:H100";
 
             const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchGet?ranges=${encodeURIComponent(dailyRange)}&ranges=${encodeURIComponent(masterRange)}&key=${apiKey}`;
 
@@ -53,18 +58,22 @@ export function useInventoryData() {
             const parsed = parseGoogleSheetsData(dailyValues);
             setData(parsed);
 
-            // Parse Min Stock from Master Sheet (Col C: Name, Col G: Min Stock)
-            const minStockMap: Record<string, number> = {};
+            // Parse Metadata from Master Sheet (Col C: Name, Col G: Min Stock, Col H: Daily Target)
+            const metadataMap: Record<string, ProductMetadata> = {};
             if (masterValues) {
                 masterValues.slice(1).forEach((row: any[]) => {
                     const productName = row[2]; // Column C
                     const minStock = parseFloat(row[6]); // Column G
-                    if (productName && !isNaN(minStock)) {
-                        minStockMap[productName] = minStock;
+                    const targetSalesDaily = parseFloat(row[7]); // Column H
+                    if (productName) {
+                        metadataMap[productName] = {
+                            minStock: isNaN(minStock) ? 0 : minStock,
+                            targetSalesDaily: isNaN(targetSalesDaily) ? 0 : targetSalesDaily
+                        };
                     }
                 });
             }
-            setMinStockData(minStockMap);
+            setProductMetadata(metadataMap);
         } catch (err: any) {
             console.error("Fetch error:", err);
             setError(err.message || "Failed to fetch data");
@@ -87,5 +96,5 @@ export function useInventoryData() {
         return { min: dates[0], max: dates[dates.length - 1] };
     }, [data]);
 
-    return { data, minStockData, loading, error, products, dateRange, refresh: fetchData };
+    return { data, productMetadata, loading, error, products, dateRange, refresh: fetchData };
 }
