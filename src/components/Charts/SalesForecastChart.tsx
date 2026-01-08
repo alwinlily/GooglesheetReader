@@ -33,19 +33,19 @@ const SalesForecastChart: React.FC<SalesForecastChartProps> = ({ data, productNa
                     <Tooltip
                         contentStyle={{ backgroundColor: '#161b22', borderColor: '#30363d', color: '#f0f6fc' }}
                         itemStyle={{ fontSize: '12px' }}
-                        labelFormatter={(label) => new Date(label).toLocaleDateString(undefined, {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        })}
+                        labelFormatter={(label) => {
+                            const date = new Date(label);
+                            const pastDate = new Date(date);
+                            pastDate.setMonth(date.getMonth() - 1);
+                            return `Forecast: ${date.toLocaleDateString()} (vs ${pastDate.toLocaleDateString()})`;
+                        }}
                     />
                     <Legend verticalAlign="bottom" height={36} />
 
                     <Line
-                        name="Actual Sales"
+                        name="Last Month Actual"
                         type="monotone"
-                        dataKey="actual"
+                        dataKey="pastActual"
                         stroke="#a371f7"
                         strokeWidth={2}
                         dot={{ r: 3, fill: "#a371f7" }}
@@ -53,7 +53,7 @@ const SalesForecastChart: React.FC<SalesForecastChartProps> = ({ data, productNa
                         connectNulls
                     />
                     <Line
-                        name="Forecast Target"
+                        name="Target Forecast"
                         type="monotone"
                         dataKey="forecast"
                         stroke="#58a6ff"
