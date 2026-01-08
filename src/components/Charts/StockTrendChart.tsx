@@ -1,14 +1,14 @@
-import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 
 interface StockTrendChartProps {
     data: any[];
     sizes: string[];
     metric: 'Stock' | 'Sales';
     onMetricChange: (metric: 'Stock' | 'Sales') => void;
+    minStock?: number;
 }
 
-const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, onMetricChange }) => {
+const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, onMetricChange, minStock }) => {
     const colors = ["#58a6ff", "#238636", "#d29922", "#da3633", "#ab7df8"];
 
     return (
@@ -19,8 +19,8 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, 
                     <button
                         onClick={() => onMetricChange('Stock')}
                         className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all duration-200 ${metric === 'Stock'
-                                ? 'bg-accent-primary text-white shadow-lg scale-105'
-                                : 'text-secondary hover:text-primary hover:bg-[#30363d]'
+                            ? 'bg-accent-primary text-white shadow-lg scale-105'
+                            : 'text-secondary hover:text-primary hover:bg-[#30363d]'
                             }`}
                     >
                         Stock
@@ -28,8 +28,8 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, 
                     <button
                         onClick={() => onMetricChange('Sales')}
                         className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all duration-200 ${metric === 'Sales'
-                                ? 'bg-[#a371f7] text-white shadow-lg scale-105'
-                                : 'text-secondary hover:text-primary hover:bg-[#30363d]'
+                            ? 'bg-[#a371f7] text-white shadow-lg scale-105'
+                            : 'text-secondary hover:text-primary hover:bg-[#30363d]'
                             }`}
                     >
                         Sales
@@ -51,6 +51,20 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, 
                         itemStyle={{ fontSize: '12px' }}
                     />
                     <Legend iconType="circle" />
+                    {minStock !== undefined && metric === 'Stock' && (
+                        <ReferenceLine
+                            y={minStock}
+                            stroke="#da3633"
+                            strokeDasharray="3 3"
+                            label={{
+                                value: `Min Stock: ${minStock}`,
+                                position: 'right',
+                                fill: '#da3633',
+                                fontSize: 10,
+                                fontWeight: 'bold'
+                            }}
+                        />
+                    )}
                     {sizes.map((size, index) => (
                         <Line
                             key={size}

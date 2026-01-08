@@ -5,6 +5,7 @@ import { MOCK_SHEET_DATA } from "../utils/mockData";
 
 export function useInventoryData() {
     const [data, setData] = useState<InventoryRecord[]>([]);
+    const [minStockData, setMinStockData] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -24,10 +25,12 @@ export function useInventoryData() {
                 return;
             }
 
-            const range = "Invetory Daily!A1:ZZ1000"; // Adjust range as needed
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?key=${apiKey}`;
+            const dailyRange = "dummy!A1:ZZ1000";
+            const masterRange = "Inventory_Master!A1:G100";
 
-            const response = await fetch(url);
+            const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchGet?ranges=${encodeURIComponent(dailyRange)}&ranges=${encodeURIComponent(masterRange)}&key=${apiKey}`;
+
+            const response = await fetch(batchUrl);
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -36,12 +39,32 @@ export function useInventoryData() {
 
             const result = await response.json();
 
-            if (!result.values) {
-                throw new Error("No data found in the specified sheet range.");
+            if (!result.valueRanges || result.valueRanges.length < 2) {
+                throw new Error("Required sheet data not found.");
             }
 
-            const parsed = parseGoogleSheetsData(result.values);
+            const dailyValues = result.valueRanges[0].values;
+            const masterValues = result.valueRanges[1].values;
+
+            if (!dailyValues) {
+                throw new Error("No data found in the Daily sheet.");
+            }
+
+            const parsed = parseGoogleSheetsData(dailyValues);
             setData(parsed);
+
+            // Parse Min Stock from Master Sheet (Col C: Name, Col G: Min Stock)
+            const minStockMap: Record<string, number> = {};
+            if (masterValues) {
+                masterValues.slice(1).forEach((row: any[]) => {
+                    const productName = row[2]; // Column C
+                    const minStock = parseFloat(row[6]); // Column G
+                    if (productName && !isNaN(minStock)) {
+                        minStockMap[productName] = minStock;
+                    }
+                });
+            }
+            setMinStockData(minStockMap);
         } catch (err: any) {
             console.error("Fetch error:", err);
             setError(err.message || "Failed to fetch data");
@@ -64,5 +87,5 @@ export function useInventoryData() {
         return { min: dates[0], max: dates[dates.length - 1] };
     }, [data]);
 
-    return { data, loading, error, products, dateRange, refresh: fetchData };
+    return { data, minStockData, loading, error, products, dateRange, refresh: fetchData };
 }

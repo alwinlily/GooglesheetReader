@@ -12,7 +12,7 @@ import { jsPDF } from 'jspdf';
 import './styles/index.css';
 
 function App() {
-  const { data, loading, error, products, dateRange, refresh } = useInventoryData();
+  const { data, minStockData, loading, error, products, dateRange, refresh } = useInventoryData();
   const dashboardRef = useRef<HTMLDivElement>(null);
 
   const [selectedProduct, setSelectedProduct] = useState('All');
@@ -130,6 +130,11 @@ function App() {
 
   const hasInvalidData = useMemo(() => filteredData.some(r => !r.validStock), [filteredData]);
 
+  const currentMinStock = useMemo(() => {
+    if (selectedProduct === 'All') return undefined;
+    return minStockData[selectedProduct];
+  }, [selectedProduct, minStockData]);
+
   if (error) {
     return (
       <div className="dashboard-container flex items-center justify-center" style={{ height: '100vh' }}>
@@ -179,6 +184,7 @@ function App() {
           sizes={selectedSize === 'All' ? ['S', 'M', 'L', 'XL', 'XXL'] : [selectedSize]}
           metric={selectedMetric}
           onMetricChange={setSelectedMetric}
+          minStock={currentMinStock}
         />
         <div className="chart-full">
           <TopSalesTable data={topSalesData} />
