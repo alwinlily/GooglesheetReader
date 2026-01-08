@@ -12,6 +12,7 @@ import {
     ReferenceLine,
     Label
 } from 'recharts';
+import { Target, Box, History, AlertTriangle } from 'lucide-react';
 
 interface UnifiedForecastChartProps {
     data: any[];
@@ -32,17 +33,48 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                         Unified Inventory Guide: {productName}
                     </h3>
                     <div className="text-[10px] text-secondary italic">
-                        Aligning Sales Targets with Stock Availability
+                        Strategic Alignment of Sales Targets & Stock Levels
                     </div>
                 </div>
-                {outOfStockPoint && outOfStockPoint.stock <= 0 && (
-                    <div className="flex flex-col items-end">
-                        <div className="text-[10px] text-secondary font-bold uppercase mb-1">Estimated Stock-Out</div>
-                        <div className="text-sm font-bold text-red-500 bg-red-500/10 px-3 py-1 rounded border border-red-500/20">
-                            {new Date(outOfStockPoint.date).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+
+                <div className="flex items-center gap-6">
+                    {/* Compact Metrics Row */}
+                    <div className="flex items-center gap-4 bg-[#161b22] px-4 py-2 rounded-lg border border-[#30363d]">
+                        <div className="flex items-center gap-2 pr-4 border-r border-[#30363d]">
+                            <Target className="w-3.5 h-3.5 text-secondary" />
+                            <div>
+                                <div className="text-[10px] text-secondary uppercase font-bold leading-tight">Target</div>
+                                <div className="text-sm font-extrabold text-white leading-tight">{data[0]?.target || 0}</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 pr-4 border-r border-[#30363d]">
+                            <Box className="w-3.5 h-3.5 text-accent-primary" />
+                            <div>
+                                <div className="text-[10px] text-secondary uppercase font-bold leading-tight">Stock</div>
+                                <div className="text-sm font-extrabold text-[#58a6ff] leading-tight">{data[0]?.stock || 0}</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <History className="w-3.5 h-3.5 text-secondary" />
+                            <div>
+                                <div className="text-[10px] text-secondary uppercase font-bold leading-tight">End</div>
+                                <div className="text-sm font-extrabold text-white opacity-60 leading-tight">{data[data.length - 1]?.stock || 0}</div>
+                            </div>
                         </div>
                     </div>
-                )}
+
+                    {outOfStockPoint && outOfStockPoint.stock <= 0 && (
+                        <div className="flex items-center gap-3 bg-red-500/5 px-4 py-2 rounded-lg border border-red-500/20">
+                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                            <div>
+                                <div className="text-[10px] text-red-500/70 uppercase font-extrabold leading-tight">Stock Out</div>
+                                <div className="text-sm font-black text-red-500 leading-tight">
+                                    {new Date(outOfStockPoint.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <ResponsiveContainer width="100%" height="80%">
@@ -135,22 +167,7 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                     />
                 </ComposedChart>
             </ResponsiveContainer>
-
-            <div className="grid grid-cols-3 gap-4 mt-4">
-                <div className="bg-[#161b22] p-3 rounded border border-[#30363d]">
-                    <div className="text-[10px] text-secondary uppercase font-bold mb-1">Daily Target</div>
-                    <div className="text-lg font-bold text-white">{data[0]?.target || 0} units</div>
-                </div>
-                <div className="bg-[#161b22] p-3 rounded border border-[#30363d]">
-                    <div className="text-[10px] text-secondary uppercase font-bold mb-1">Current Stock</div>
-                    <div className="text-lg font-bold text-[#58a6ff]">{data[0]?.stock || 0} units</div>
-                </div>
-                <div className="bg-[#161b22] p-3 rounded border border-[#30363d]">
-                    <div className="text-[10px] text-secondary uppercase font-bold mb-1">Target End Stock</div>
-                    <div className="text-lg font-bold text-white text-secondary opacity-50">{data[data.length - 1]?.stock || 0} units</div>
-                </div>
-            </div>
-        </div>
+        </div >
     );
 };
 
