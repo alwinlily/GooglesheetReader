@@ -6,8 +6,7 @@ import SummaryCards from './components/Dashboard/SummaryCards';
 import StockTrendChart from './components/Charts/StockTrendChart';
 import InOutChart from './components/Charts/InOutChart';
 import TopSalesTable from './components/Dashboard/TopSalesTable';
-import SalesForecastChart from './components/Charts/SalesForecastChart';
-import StockDepletionChart from './components/Charts/StockDepletionChart';
+import UnifiedForecastChart from './components/Charts/UnifiedForecastChart';
 import type { Size } from './types/inventory';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -144,61 +143,14 @@ function App() {
     return metadata[selectedSize]?.minStock;
   }, [selectedProduct, selectedSize, productMetadata]);
 
-  const forecastData = useMemo(() => {
+  const unifiedForecastData = useMemo(() => {
     if (selectedProduct === 'All') return [];
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const oneMonthAgo = new Date(today);
-    oneMonthAgo.setMonth(today.getMonth() - 1);
-
     const oneMonthAhead = new Date(today);
     oneMonthAhead.setMonth(today.getMonth() + 1);
-
-    const metadata = productMetadata[selectedProduct];
-    let targetDaily = 0;
-    if (metadata) {
-      if (selectedSize === 'All') {
-        // Aggregate daily target across all sizes for the product
-        targetDaily = Object.values(metadata).reduce((sum, m) => sum + m.targetSalesDaily, 0);
-      } else {
-        targetDaily = metadata[selectedSize]?.targetSalesDaily || 0;
-      }
-    }
-
-    // 1. Past Sales Data
-    const pastSalesMap: Record<string, number> = {};
-    filteredData.forEach(r => {
-      const d = new Date(r.date);
-      if (d >= oneMonthAgo && d <= today) {
-        pastSalesMap[r.date] = (pastSalesMap[r.date] || 0) + r.out;
-      }
-    });
-
-    const combinedData: any[] = [];
-
-    // Fill the next 30 days with both Forecast Target and Last Month's Actuals
-    for (let d = new Date(today); d <= oneMonthAhead; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0];
-
-      // Find corresponding date from one month ago
-      const pastDate = new Date(d);
-      pastDate.setMonth(d.getMonth() - 1);
-      const pastDateStr = pastDate.toISOString().split('T')[0];
-
-      combinedData.push({
-        date: dateStr,
-        forecast: targetDaily,
-        pastActual: pastSalesMap[pastDateStr] || 0
-      });
-    }
-
-    return combinedData;
-  }, [filteredData, selectedProduct, productMetadata]);
-
-  const stockDepletionData = useMemo(() => {
-    if (selectedProduct === 'All') return [];
 
     const metadata = productMetadata[selectedProduct];
     let targetDaily = 0;
@@ -214,9 +166,16 @@ function App() {
       }
     }
 
-    if (targetDaily <= 0) return [];
+    // 1. Past Sales Data Mapping (for overlay)
+    const pastSalesMap: Record<string, number> = {};
+    filteredData.forEach(r => {
+      const d = new Date(r.date);
+      if (d <= today) {
+        pastSalesMap[r.date] = (pastSalesMap[r.date] || 0) + r.out;
+      }
+    });
 
-    // Current stock: sum of stock for selected product/size on the latest date
+    // 2. Current stock
     const latestDate = dateRange.max;
     const currentStock = filteredData
       .filter(r => r.date === latestDate)
@@ -224,23 +183,28 @@ function App() {
 
     const dataPoints: any[] = [];
     let projectedStock = currentStock;
-    const startDate = new Date();
-    startDate.setHours(0, 0, 0, 0);
 
-    // Project up to 60 days
-    for (let i = 0; i <= 60; i++) {
-      const d = new Date(startDate);
-      d.setDate(startDate.getDate() + i);
+    // Combine into a 30-60 day forecast window
+    // We'll show 30 days of forecast as requested previously
+    for (let i = 0; i <= 30; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
       const dateStr = d.toISOString().split('T')[0];
+
+      // Past date for overlay
+      const pastDate = new Date(d);
+      pastDate.setMonth(d.getMonth() - 1);
+      const pastDateStr = pastDate.toISOString().split('T')[0];
 
       dataPoints.push({
         date: dateStr,
+        target: targetDaily,
+        pastActual: pastSalesMap[pastDateStr] || 0,
         stock: Math.max(0, projectedStock),
         minStock: minStockTotal
       });
 
       projectedStock -= targetDaily;
-      if (projectedStock < -targetDaily * 5) break; // Stop a bit after hitting 0
     }
 
     return dataPoints;
@@ -302,10 +266,7 @@ function App() {
         </div>
         <InOutChart data={inOutData} />
         {selectedProduct !== 'All' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SalesForecastChart data={forecastData} productName={selectedProduct} />
-            <StockDepletionChart data={stockDepletionData} productName={selectedProduct} />
-          </div>
+          <UnifiedForecastChart data={unifiedForecastData} productName={selectedProduct} />
         )}
       </div>
 
