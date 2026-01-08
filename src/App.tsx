@@ -133,8 +133,15 @@ function App() {
 
   const currentMinStock = useMemo(() => {
     if (selectedProduct === 'All') return undefined;
-    return productMetadata[selectedProduct]?.minStock;
-  }, [selectedProduct, productMetadata]);
+    const metadata = productMetadata[selectedProduct];
+    if (!metadata) return undefined;
+
+    if (selectedSize === 'All') {
+      // Aggregate min stock across all sizes for the product
+      return Object.values(metadata).reduce((sum, m) => sum + m.minStock, 0);
+    }
+    return metadata[selectedSize]?.minStock;
+  }, [selectedProduct, selectedSize, productMetadata]);
 
   const forecastData = useMemo(() => {
     if (selectedProduct === 'All') return [];
@@ -148,7 +155,16 @@ function App() {
     const oneMonthAhead = new Date(today);
     oneMonthAhead.setMonth(today.getMonth() + 1);
 
-    const targetDaily = productMetadata[selectedProduct]?.targetSalesDaily || 0;
+    const metadata = productMetadata[selectedProduct];
+    let targetDaily = 0;
+    if (metadata) {
+      if (selectedSize === 'All') {
+        // Aggregate daily target across all sizes for the product
+        targetDaily = Object.values(metadata).reduce((sum, m) => sum + m.targetSalesDaily, 0);
+      } else {
+        targetDaily = metadata[selectedSize]?.targetSalesDaily || 0;
+      }
+    }
 
     // 1. Past Sales Data
     const pastSalesMap: Record<string, number> = {};

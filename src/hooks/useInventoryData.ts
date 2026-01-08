@@ -10,7 +10,7 @@ export interface ProductMetadata {
 
 export function useInventoryData() {
     const [data, setData] = useState<InventoryRecord[]>([]);
-    const [productMetadata, setProductMetadata] = useState<Record<string, ProductMetadata>>({});
+    const [productMetadata, setProductMetadata] = useState<Record<string, Record<string, ProductMetadata>>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -58,15 +58,20 @@ export function useInventoryData() {
             const parsed = parseGoogleSheetsData(dailyValues);
             setData(parsed);
 
-            // Parse Metadata from Master Sheet (Col C: Name, Col G: Min Stock, Col H: Daily Target)
-            const metadataMap: Record<string, ProductMetadata> = {};
+            // Parse Metadata from Master Sheet (Col C: Name, Col E: Size, Col G: Min Stock, Col H: Daily Target)
+            const metadataMap: Record<string, Record<string, ProductMetadata>> = {};
             if (masterValues) {
                 masterValues.slice(1).forEach((row: any[]) => {
                     const productName = row[2]; // Column C
+                    const size = row[4] as string; // Column E
                     const minStock = parseFloat(row[6]); // Column G
                     const targetSalesDaily = parseFloat(row[7]); // Column H
-                    if (productName) {
-                        metadataMap[productName] = {
+
+                    if (productName && size) {
+                        if (!metadataMap[productName]) {
+                            metadataMap[productName] = {};
+                        }
+                        metadataMap[productName][size] = {
                             minStock: isNaN(minStock) ? 0 : minStock,
                             targetSalesDaily: isNaN(targetSalesDaily) ? 0 : targetSalesDaily
                         };
