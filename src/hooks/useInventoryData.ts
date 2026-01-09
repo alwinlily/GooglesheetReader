@@ -30,7 +30,7 @@ export function useInventoryData() {
                 return;
             }
 
-            const dailyRange = "Inventory_daily!A1:ZZ1000";
+            const dailyRange = "Invetory Daily!A1:ZZ1000";
             const masterRange = "Inventory_Master!A1:H100";
 
             const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchGet?ranges=${encodeURIComponent(dailyRange)}&ranges=${encodeURIComponent(masterRange)}&key=${apiKey}`;
