@@ -253,22 +253,22 @@ function App() {
         totalOut={stats.totalOut}
       />
 
-      <div className="chart-grid">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div className="flex flex-col gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <TopSalesTable data={topSalesData} />
-          <StockTrendChart
-            data={trendData}
-            sizes={selectedSize === 'All' ? ['S', 'M', 'L', 'XL', 'XXL'] : [selectedSize]}
-            metric={selectedMetric}
-            onMetricChange={setSelectedMetric}
-            minStock={currentMinStock}
-          />
+          <div className="lg:col-span-2">
+            <StockTrendChart
+              data={trendData}
+              sizes={selectedSize === 'All' ? ['S', 'M', 'L', 'XL', 'XXL'] : [selectedSize]}
+              metric={selectedMetric}
+              onMetricChange={setSelectedMetric}
+              minStock={currentMinStock}
+            />
+          </div>
         </div>
 
         {selectedProduct !== 'All' && (
-          <div className="mb-8">
-            <UnifiedForecastChart data={unifiedForecastData} productName={selectedProduct} />
-          </div>
+          <UnifiedForecastChart data={unifiedForecastData} productName={selectedProduct} />
         )}
 
         <InOutChart data={inOutData} />
