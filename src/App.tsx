@@ -63,10 +63,13 @@ function App() {
   const trendData = useMemo(() => {
     // Group by date
     const dateGroups: Record<string, any> = {};
+    const todayStr = new Date().toISOString().split('T')[0];
 
     filteredData.forEach(r => {
+      if (r.date > todayStr) return; // Cap at today
+
       if (!dateGroups[r.date]) {
-        dateGroups[r.date] = { date: r.date };
+        dateGroups[r.date] = { date: r.date, total: 0 };
       }
 
       const value = selectedMetric === 'Stock' ? (r.stock || 0) : r.out;
@@ -77,6 +80,8 @@ function App() {
       } else {
         dateGroups[r.date][r.size] = value;
       }
+
+      dateGroups[r.date].total += value;
     });
 
     return Object.values(dateGroups).sort((a: any, b: any) => a.date.localeCompare(b.date));
@@ -84,7 +89,11 @@ function App() {
 
   const inOutData = useMemo(() => {
     const dateGroups: Record<string, any> = {};
+    const todayStr = new Date().toISOString().split('T')[0];
+
     filteredData.forEach(r => {
+      if (r.date > todayStr) return; // Cap at today
+
       if (!dateGroups[r.date]) {
         dateGroups[r.date] = { date: r.date, in: 0, out: 0 };
       }
@@ -263,6 +272,7 @@ function App() {
               metric={selectedMetric}
               onMetricChange={setSelectedMetric}
               minStock={currentMinStock}
+              totalAggregate={stats.totalOut}
             />
           </div>
         </div>

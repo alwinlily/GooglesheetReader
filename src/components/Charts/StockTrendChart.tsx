@@ -6,9 +6,49 @@ interface StockTrendChartProps {
     metric: 'Stock' | 'Sales';
     onMetricChange: (metric: 'Stock' | 'Sales') => void;
     minStock?: number;
+    totalAggregate?: number;
 }
 
-const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, onMetricChange, minStock }) => {
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        // Sort payload to ensure "Total Sales" is at the bottom
+        const sortedPayload = [...payload].sort((a, b) => {
+            if (a.name === 'Total Sales') return 1;
+            if (b.name === 'Total Sales') return -1;
+
+            // Define size order
+            const sizeOrder = ['S', 'M', 'L', 'XL', 'XXL'];
+            const aIndex = sizeOrder.indexOf(a.name);
+            const bIndex = sizeOrder.indexOf(b.name);
+
+            if (aIndex !== -1 && bIndex !== -1) {
+                return aIndex - bIndex;
+            }
+            return 0;
+        });
+
+        return (
+            <div className="bg-[#161b22] border border-[#30363d] p-3 rounded-lg shadow-xl">
+                <p className="text-[#f0f6fc] text-sm font-bold mb-2">{label}</p>
+                <div className="flex flex-col gap-1">
+                    {sortedPayload.map((entry: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between gap-4">
+                            <span style={{ color: entry.color, fontSize: '12px', fontWeight: 'bold' }}>
+                                {entry.name} :
+                            </span>
+                            <span className="text-white text-sm font-bold">
+                                {entry.value}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
+const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, onMetricChange, minStock, totalAggregate }) => {
     const colors = ["#58a6ff", "#238636", "#d29922", "#da3633", "#ab7df8"];
 
     return (
@@ -46,10 +86,7 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, 
                         tickFormatter={(str) => new Date(str).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     />
                     <YAxis stroke="#8b949e" fontSize={12} />
-                    <Tooltip
-                        contentStyle={{ backgroundColor: '#161b22', borderColor: '#30363d', color: '#f0f6fc' }}
-                        itemStyle={{ fontSize: '12px' }}
-                    />
+                    <Tooltip content={<CustomTooltip />} />
                     <Legend iconType="circle" />
                     {minStock !== undefined && metric === 'Stock' && (
                         <ReferenceLine
@@ -77,8 +114,29 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, 
                             connectNulls={false} // Gap for missing stock as per PRD
                         />
                     ))}
+                    {metric === 'Sales' && (
+                        <Line
+                            type="monotone"
+                            dataKey="total"
+                            name="Total Sales"
+                            stroke="#ffffff"
+                            strokeWidth={3}
+                            strokeDasharray="5 5"
+                            dot={{ r: 5, fill: '#ffffff' }}
+                            activeDot={{ r: 8 }}
+                        />
+                    )}
                 </LineChart>
             </ResponsiveContainer>
+
+            {metric === 'Sales' && totalAggregate !== undefined && (
+                <div className="mt-4 pt-4 border-t border-[#30363d] flex justify-between items-center">
+                    <span className="text-secondary text-xs font-bold uppercase tracking-wider">Total Sales for Period</span>
+                    <span className="text-xl font-bold" style={{ color: '#ffffff' }}>
+                        {totalAggregate.toLocaleString()}
+                    </span>
+                </div>
+            )}
         </div>
     );
 };
