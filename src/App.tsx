@@ -7,6 +7,7 @@ import StockTrendChart from './components/Charts/StockTrendChart';
 import InOutChart from './components/Charts/InOutChart';
 import TopSalesTable from './components/Dashboard/TopSalesTable';
 import UnifiedForecastChart from './components/Charts/UnifiedForecastChart';
+import StockBreakdownChart from './components/Charts/StockBreakdownChart';
 import type { Size } from './types/inventory';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -41,7 +42,8 @@ function App() {
   }, [data, selectedProduct, selectedSize, startDate, endDate]);
 
   const stats = useMemo(() => {
-    const totalIn = filteredData.reduce((sum, r) => sum + r.in, 0);
+    const totalIn = filteredData.filter(r => !r.isReturn).reduce((sum, r) => sum + r.in, 0);
+    const totalReturn = filteredData.filter(r => r.isReturn).reduce((sum, r) => sum + r.in, 0);
     const totalOut = filteredData.reduce((sum, r) => sum + r.out, 0);
 
     // Total stock: latest valid stock per distinct product+size
@@ -57,7 +59,7 @@ function App() {
 
     const totalStock = Object.values(latestStocks).reduce((sum, val) => sum + val, 0);
 
-    return { totalIn, totalOut, totalStock };
+    return { totalIn, totalReturn, totalOut, totalStock };
   }, [filteredData]);
 
   const trendData = useMemo(() => {
@@ -72,17 +74,28 @@ function App() {
         dateGroups[r.date] = { date: r.date, total: 0 };
       }
 
-      const value = selectedMetric === 'Stock' ? (r.stock || 0) : r.out;
+      const value = selectedMetric === 'Stock' ? (r.stock ?? undefined) : r.out;
 
       if (selectedProduct === 'All') {
         // Aggregate across products if "All" is selected
-        dateGroups[r.date][r.size] = (dateGroups[r.date][r.size] || 0) + value;
+        if (value !== undefined) {
+          dateGroups[r.date][r.size] = (dateGroups[r.date][r.size] || 0) + value;
+          dateGroups[r.date].total += value;
+        }
       } else {
         dateGroups[r.date][r.size] = value;
+        if (value !== undefined) {
+          dateGroups[r.date].total += value;
+        }
       }
-
-      dateGroups[r.date].total += value;
     });
+
+    // Remove "total" if a specific size is selected to avoid redundancy
+    if (selectedSize !== 'All') {
+      Object.values(dateGroups).forEach((g: any) => {
+        delete g.total;
+      });
+    }
 
     return Object.values(dateGroups).sort((a: any, b: any) => a.date.localeCompare(b.date));
   }, [filteredData, selectedProduct, selectedSize, selectedMetric]);
@@ -95,13 +108,54 @@ function App() {
       if (r.date > todayStr) return; // Cap at today
 
       if (!dateGroups[r.date]) {
-        dateGroups[r.date] = { date: r.date, in: 0, out: 0 };
+        dateGroups[r.date] = { date: r.date, in: 0, out: 0, returned: 0 };
       }
-      dateGroups[r.date].in += r.in;
+      if (r.isReturn) {
+          dateGroups[r.date].returned += r.in;
+      } else {
+          dateGroups[r.date].in += r.in;
+      }
       dateGroups[r.date].out += r.out;
     });
     return Object.values(dateGroups).sort((a: any, b: any) => a.date.localeCompare(b.date));
   }, [filteredData]);
+
+  const validationMismatches = useMemo(() => {
+    const mismatches: Array<{ product: string; size: string; date: string; expected: number; actual: number }> = [];
+
+    // Group by product and size from the full dataset to ensure continuous history
+    const grouped = data.reduce((acc, curr) => {
+      const key = `${curr.product}|${curr.size}`;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(curr);
+      return acc;
+    }, {} as Record<string, any[]>);
+
+    Object.entries(grouped).forEach(([key, records]) => {
+      const [product, size] = key.split('|');
+      const sorted = [...records].sort((a, b) => a.date.localeCompare(b.date));
+
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = sorted[i - 1];
+        const curr = sorted[i];
+
+        if (prev.stock !== null && curr.stock !== null && prev.validStock && curr.validStock) {
+          const expected = prev.stock + prev.in - prev.out;
+          if (expected !== curr.stock) {
+            mismatches.push({
+              product,
+              size,
+              date: curr.date,
+              expected,
+              actual: curr.stock
+            });
+          }
+        }
+      }
+    });
+
+    return mismatches;
+  }, [data]);
 
   const topSalesData = useMemo(() => {
     const salesMap: Record<string, { product: string; size: string; sales: number }> = {};
@@ -114,10 +168,42 @@ function App() {
       salesMap[key].sales += r.out;
     });
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     return Object.values(salesMap)
       .sort((a, b) => b.sales - a.sales)
-      .slice(0, 5);
-  }, [filteredData]);
+      .slice(0, 5)
+      .map(item => {
+        // Find latest valid stock for this specific item
+        const itemData = data
+          .filter(r => r.product === item.product && r.size === item.size && r.stock !== null)
+          .sort((a, b) => b.date.localeCompare(a.date))[0];
+
+        const stock = itemData?.stock || 0;
+        const metadata = productMetadata[item.product]?.[item.size];
+        const targetDaily = metadata?.targetSalesDaily || 0;
+
+        let stockOutDate: string | null = null;
+        if (targetDaily > 0) {
+          const daysToStockOut = Math.floor(stock / targetDaily);
+          const outDate = new Date(today);
+          outDate.setDate(today.getDate() + daysToStockOut);
+          stockOutDate = outDate.toISOString().split('T')[0];
+        }
+
+        const itemMismatches = validationMismatches.filter(m => m.product === item.product && m.size === item.size);
+        const hasMismatch = itemMismatches.length > 0;
+
+        return {
+          ...item,
+          stock,
+          target: targetDaily,
+          stockOutDate,
+          hasMismatch
+        };
+      });
+  }, [data, filteredData, productMetadata, validationMismatches]);
 
   const exportPDF = async () => {
     if (!dashboardRef.current) return;
@@ -139,6 +225,24 @@ function App() {
   };
 
   const hasInvalidData = useMemo(() => filteredData.some(r => !r.validStock), [filteredData]);
+
+  const stockBreakdown = useMemo(() => {
+    const breakdown: Record<string, number> = { 'S': 0, 'M': 0, 'L': 0, 'XL': 0, 'XXL': 0 };
+
+    // Get latest stock per product+size from the full filtered dataset
+    const latestStocks: Record<string, number> = {};
+    const sortedData = [...filteredData].sort((a, b) => b.date.localeCompare(a.date));
+
+    for (const r of sortedData) {
+      const key = `${r.product}-${r.size}`;
+      if (r.stock !== null && latestStocks[key] === undefined) {
+        latestStocks[key] = r.stock;
+        breakdown[r.size] = (breakdown[r.size] || 0) + r.stock;
+      }
+    }
+
+    return Object.entries(breakdown).map(([size, stock]) => ({ size, stock }));
+  }, [filteredData]);
 
   const currentMinStock = useMemo(() => {
     if (selectedProduct === 'All') return undefined;
@@ -235,11 +339,20 @@ function App() {
     <div className="dashboard-container" ref={dashboardRef}>
       <Header onExport={exportPDF} onRefresh={refresh} loading={loading} />
 
-      {hasInvalidData && (
+      {(hasInvalidData || validationMismatches.length > 0) && (
         <div className="card mb-8" style={{ borderColor: 'var(--warning)', backgroundColor: 'rgba(210, 153, 34, 0.05)' }}>
-          <p className="text-sm" style={{ color: 'var(--warning)' }}>
-            ⚠️ <strong>Data Warning:</strong> Some stock values were found to be invalid (negative) and have been excluded from the charts.
-          </p>
+          <div className="flex flex-col gap-2">
+            {hasInvalidData && (
+              <p className="text-sm" style={{ color: 'var(--warning)' }}>
+                ⚠️ <strong>Data Warning:</strong> Some stock values were found to be invalid (negative) and have been excluded.
+              </p>
+            )}
+            {validationMismatches.length > 0 && (
+              <p className="text-sm" style={{ color: 'var(--warning)' }}>
+                🚨 <strong>Validation Issue:</strong> {validationMismatches.length} stock mismatch(es) detected. Expected stock (from yesterday's movement) does not match reported stock.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -260,21 +373,24 @@ function App() {
         totalStock={stats.totalStock}
         totalIn={stats.totalIn}
         totalOut={stats.totalOut}
+        totalReturn={stats.totalReturn}
       />
 
       <div className="flex flex-col gap-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <TopSalesTable data={topSalesData} />
-          <div className="lg:col-span-2">
-            <StockTrendChart
-              data={trendData}
-              sizes={selectedSize === 'All' ? ['S', 'M', 'L', 'XL', 'XXL'] : [selectedSize]}
-              metric={selectedMetric}
-              onMetricChange={setSelectedMetric}
-              minStock={currentMinStock}
-              totalAggregate={stats.totalOut}
-            />
-          </div>
+          <StockBreakdownChart data={stockBreakdown} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6">
+          <StockTrendChart
+            data={trendData}
+            sizes={selectedSize === 'All' ? ['S', 'M', 'L', 'XL', 'XXL'] : [selectedSize]}
+            metric={selectedMetric}
+            onMetricChange={setSelectedMetric}
+            minStock={currentMinStock}
+            totalAggregate={selectedMetric === 'Stock' ? stats.totalStock : stats.totalOut}
+          />
         </div>
 
         {selectedProduct !== 'All' && (

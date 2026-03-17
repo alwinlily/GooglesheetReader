@@ -5,10 +5,10 @@ interface SummaryCardsProps {
     totalStock: number;
     totalIn: number;
     totalOut: number;
+    totalReturn?: number;
 }
 
-const SummaryCards: React.FC<SummaryCardsProps> = ({ totalStock, totalIn, totalOut }) => {
-    const netMovement = totalIn - totalOut;
+const SummaryCards: React.FC<SummaryCardsProps> = ({ totalStock, totalIn, totalOut, totalReturn = 0 }) => {
 
     return (
         <div className="filter-grid mb-8">
@@ -18,7 +18,7 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({ totalStock, totalIn, totalO
                 </div>
                 <div>
                     <p className="text-secondary text-sm font-bold">Total Stock</p>
-                    <p className="text-xl font-bold">{totalStock.toLocaleString()}</p>
+                    <p className="text-xl font-bold number-stroke">{totalStock.toLocaleString()}</p>
                 </div>
             </div>
 
@@ -47,9 +47,9 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({ totalStock, totalIn, totalO
                     <Activity className="w-6 h-6" style={{ color: 'var(--warning)' }} />
                 </div>
                 <div>
-                    <p className="text-secondary text-sm font-bold">Net Movement</p>
-                    <p className="text-xl font-bold" style={{ color: netMovement >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                        {netMovement > 0 ? '+' : ''}{netMovement.toLocaleString()}
+                    <p className="text-secondary text-sm font-bold">Total Returned</p>
+                    <p className="text-xl font-bold" style={{ color: 'var(--warning)' }}>
+                        +{totalReturn.toLocaleString()}
                     </p>
                 </div>
             </div>

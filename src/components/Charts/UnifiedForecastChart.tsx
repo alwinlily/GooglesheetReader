@@ -37,7 +37,7 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                     </div>
                 </div>
 
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4">
                     {/* Compact Metrics Row */}
                     <div className="flex items-center gap-4 bg-[#161b22] px-4 py-2 rounded-lg border border-[#30363d]">
                         <div className="flex items-center gap-2 pr-4 border-r border-[#30363d]">
@@ -54,26 +54,34 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                                 <div className="text-sm font-extrabold text-[#58a6ff] leading-tight">{data[0]?.stock || 0}</div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 pr-4 border-r border-[#30363d]">
                             <History className="w-3.5 h-3.5 text-secondary" />
                             <div>
                                 <div className="text-[10px] text-secondary uppercase font-bold leading-tight">End</div>
                                 <div className="text-sm font-extrabold text-white opacity-60 leading-tight">{data[data.length - 1]?.stock || 0}</div>
                             </div>
                         </div>
-                    </div>
 
-                    {outOfStockPoint && outOfStockPoint.stock <= 0 && (
-                        <div className="flex items-center gap-3 bg-red-500/5 px-4 py-2 rounded-lg border border-red-500/20">
-                            <AlertTriangle className="w-4 h-4 text-red-500" />
-                            <div>
-                                <div className="text-[10px] text-red-500/70 uppercase font-extrabold leading-tight">Stock Out</div>
-                                <div className="text-sm font-black text-red-500 leading-tight">
-                                    {new Date(outOfStockPoint.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        {outOfStockPoint && outOfStockPoint.stock <= 0 ? (
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                                <div>
+                                    <div className="text-[10px] text-red-500/70 uppercase font-bold leading-tight">Stock Out</div>
+                                    <div className="text-sm font-extrabold text-red-500 leading-tight">
+                                        {new Date(outOfStockPoint.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-3.5 h-3.5 text-green-500 opacity-20" />
+                                <div>
+                                    <div className="text-[10px] text-secondary/40 uppercase font-bold leading-tight">Stock Out</div>
+                                    <div className="text-sm font-extrabold text-secondary/40 leading-tight">Stable</div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 

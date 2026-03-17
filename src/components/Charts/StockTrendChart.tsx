@@ -32,11 +32,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                 <p className="text-[#f0f6fc] text-sm font-bold mb-2">{label}</p>
                 <div className="flex flex-col gap-1">
                     {sortedPayload.map((entry: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between gap-4">
+                        <div key={index} className="flex items-center justify-between gap-4 tooltip-item-bg">
                             <span style={{ color: entry.color, fontSize: '12px', fontWeight: 'bold' }}>
                                 {entry.name} :
                             </span>
-                            <span className="text-white text-sm font-bold">
+                            <span className="text-white text-sm font-bold number-stroke">
                                 {entry.value}
                             </span>
                         </div>
@@ -114,25 +114,27 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, 
                             connectNulls={false} // Gap for missing stock as per PRD
                         />
                     ))}
-                    {metric === 'Sales' && (
+                    {data.length > 0 && 'total' in data[0] && (
                         <Line
                             type="monotone"
                             dataKey="total"
-                            name="Total Sales"
-                            stroke="#ffffff"
+                            name={`Total ${metric}`}
+                            stroke="var(--text-primary)"
                             strokeWidth={3}
                             strokeDasharray="5 5"
-                            dot={{ r: 5, fill: '#ffffff' }}
+                            dot={{ r: 5, fill: 'var(--text-primary)' }}
                             activeDot={{ r: 8 }}
+                            connectNulls={true}
+                            opacity={0.8}
                         />
                     )}
                 </LineChart>
             </ResponsiveContainer>
 
-            {metric === 'Sales' && totalAggregate !== undefined && (
-                <div className="mt-4 pt-4 border-t border-[#30363d] flex justify-between items-center">
-                    <span className="text-secondary text-xs font-bold uppercase tracking-wider">Total Sales for Period</span>
-                    <span className="text-xl font-bold" style={{ color: '#ffffff' }}>
+            {totalAggregate !== undefined && (
+                <div className="mt-4 pt-4 border-t border-[#30363d] flex justify-between items-center transition-all duration-300">
+                    <span className="text-secondary text-xs font-bold uppercase tracking-wider">Total {metric} for Period</span>
+                    <span className="text-xl font-bold number-stroke">
                         {totalAggregate.toLocaleString()}
                     </span>
                 </div>

@@ -21,24 +21,35 @@ export function parseGoogleSheetsData(rows: any[][]): InventoryRecord[] {
         const rawMetric = row2[i] ? String(row2[i]).trim() : "";
 
         if (rawHeader1) {
-            // Check if it's "Product Size" or just "Size"
             const parts = rawHeader1.split(/\s+/);
             const lastPart = parts[parts.length - 1] as Size;
 
             if (PRODUCT_SIZES.includes(lastPart)) {
+                // Case: "Product S"
                 currentSize = lastPart;
                 if (parts.length > 1) {
                     currentProduct = parts.slice(0, -1).join(" ");
                 }
             } else if (PRODUCT_SIZES.includes(rawHeader1 as Size)) {
+                // Case: "S"
                 currentSize = rawHeader1 as Size;
+            } else {
+                // Case: "Product Name" or "Total"
+                currentProduct = rawHeader1;
+                // If the product name changed, clear the size. 
+                // It will be picked up by following cells with size headers.
+                currentSize = null;
             }
         }
 
         let metric: Metric | null = null;
-        if (rawMetric === "S" || rawMetric === "Stock") metric = "Stock";
-        else if (rawMetric === "In") metric = "In";
-        else if (rawMetric === "Out") metric = "Out";
+        if (rawMetric === "S" || rawMetric === "Stock") {
+            metric = "Stock";
+        } else if (rawMetric === "In") {
+            metric = "In";
+        } else if (rawMetric === "Out") {
+            metric = "Out";
+        }
 
         if (currentProduct && currentSize && metric) {
             mappings.push({
@@ -49,6 +60,20 @@ export function parseGoogleSheetsData(rows: any[][]): InventoryRecord[] {
             });
         }
     }
+
+    // Find the Note column. Usually column FM (index 168) but search for 'Note' to be safe.
+    let noteColumnIndex = -1;
+    for (let i = 0; i < row1.length; i++) {
+        if (String(row1[i]).trim().toLowerCase() === "note") {
+            noteColumnIndex = i;
+            break;
+        }
+    }
+    // Fallback to 168 (FM) if "Note" header is accidentally changed or missing
+    if (noteColumnIndex === -1 && row1.length > 168) {
+        noteColumnIndex = 168; // 0-indexed column FM
+    }
+
 
     if (mappings.length === 0) {
         throw new Error("Invalid sheet format: No valid product/size/metric headers found");
@@ -64,7 +89,10 @@ export function parseGoogleSheetsData(rows: any[][]): InventoryRecord[] {
         const isoDate = parseDate(rawDate);
         if (!isoDate) continue;
 
-        // We need to group by Product + Size for each date
+        const isReturn = noteColumnIndex !== -1 && row[Math.min(noteColumnIndex, row.length - 1)]
+            ? String(row[Math.min(noteColumnIndex, row.length - 1)]).trim().toLowerCase() === "return"
+            : false;
+
         const productSizeGroups: Record<string, Partial<InventoryRecord>> = {};
 
         for (const mapping of mappings) {
@@ -78,6 +106,7 @@ export function parseGoogleSheetsData(rows: any[][]): InventoryRecord[] {
                     in: 0,
                     out: 0,
                     validStock: true,
+                    isReturn: isReturn,
                 };
             }
 
@@ -100,7 +129,6 @@ export function parseGoogleSheetsData(rows: any[][]): InventoryRecord[] {
             }
         }
 
-        // Convert groups to records
         for (const key in productSizeGroups) {
             records.push(productSizeGroups[key] as InventoryRecord);
         }
@@ -110,7 +138,6 @@ export function parseGoogleSheetsData(rows: any[][]): InventoryRecord[] {
 }
 
 function parseDate(rawDate: string): string | null {
-    // Expected format: MM/DD/YY
     const parts = rawDate.split("/");
     if (parts.length !== 3) return null;
 
@@ -119,7 +146,7 @@ function parseDate(rawDate: string): string | null {
     let year = parts[2];
 
     if (year.length === 2) {
-        year = "20" + year; // Assuming 20xx
+        year = "20" + year;
     }
 
     const dateStr = `${year}-${month}-${day}`;
