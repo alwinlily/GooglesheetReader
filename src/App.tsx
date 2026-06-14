@@ -4,11 +4,12 @@ import Header from './components/Dashboard/Header';
 import Filters from './components/Dashboard/Filters';
 import SummaryCards from './components/Dashboard/SummaryCards';
 import StockTrendChart from './components/Charts/StockTrendChart';
-import InOutChart from './components/Charts/InOutChart';
 import TopSalesTable from './components/Dashboard/TopSalesTable';
 import UnifiedForecastChart from './components/Charts/UnifiedForecastChart';
 import StockBreakdownChart from './components/Charts/StockBreakdownChart';
+import ReplenishmentPlanner from './components/Dashboard/ReplenishmentPlanner';
 import type { Size } from './types/inventory';
+import { TriangleAlert, AlertOctagon } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import './styles/index.css';
@@ -100,25 +101,6 @@ function App() {
     return Object.values(dateGroups).sort((a: any, b: any) => a.date.localeCompare(b.date));
   }, [filteredData, selectedProduct, selectedSize, selectedMetric]);
 
-  const inOutData = useMemo(() => {
-    const dateGroups: Record<string, any> = {};
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    filteredData.forEach(r => {
-      if (r.date > todayStr) return; // Cap at today
-
-      if (!dateGroups[r.date]) {
-        dateGroups[r.date] = { date: r.date, in: 0, out: 0, returned: 0 };
-      }
-      if (r.isReturn) {
-          dateGroups[r.date].returned += r.in;
-      } else {
-          dateGroups[r.date].in += r.in;
-      }
-      dateGroups[r.date].out += r.out;
-    });
-    return Object.values(dateGroups).sort((a: any, b: any) => a.date.localeCompare(b.date));
-  }, [filteredData]);
 
   const validationMismatches = useMemo(() => {
     const mismatches: Array<{ product: string; size: string; date: string; expected: number; actual: number }> = [];
@@ -171,22 +153,69 @@ function App() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Calculate total calendar days in the selected range
+    let totalDays = 1;
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+
+    if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    } else {
+      const dates = data.map(r => r.date).sort();
+      if (dates.length > 0) {
+        const minD = new Date(dates[0]);
+        const maxD = new Date(dates[dates.length - 1]);
+        const diffTime = Math.abs(maxD.getTime() - minD.getTime());
+        totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      }
+    }
+    if (totalDays <= 0) totalDays = 1;
+
     return Object.values(salesMap)
       .sort((a, b) => b.sales - a.sales)
-      .slice(0, 5)
+      .slice(0, 10)
       .map(item => {
-        // Find latest valid stock for this specific item
-        const itemData = data
-          .filter(r => r.product === item.product && r.size === item.size && r.stock !== null)
-          .sort((a, b) => b.date.localeCompare(a.date))[0];
+        // Find all history records for this specific item
+        const itemHistory = data.filter(r => r.product === item.product && r.size === item.size);
 
-        const stock = itemData?.stock || 0;
+        // Find latest valid stock for this specific item
+        const sortedRecords = [...itemHistory].sort((a, b) => b.date.localeCompare(a.date));
+        const latestRecordWithStock = sortedRecords.find(r => r.stock !== null);
+        const stock = latestRecordWithStock?.stock ?? 0;
+
         const metadata = productMetadata[item.product]?.[item.size];
         const targetDaily = metadata?.targetSalesDaily || 0;
 
+        // Calculate velocity (total out in selected range / calendar days)
+        const rangeRecords = itemHistory.filter(r => 
+          (!startDate || r.date >= startDate) && 
+          (!endDate || r.date <= endDate)
+        );
+        const totalOut = rangeRecords.reduce((sum, r) => sum + r.out, 0);
+        const velocity = totalOut / totalDays;
+
+        // Calculate restock interval
+        const incomingRecords = itemHistory.filter(r => r.in > 0).sort((a, b) => a.date.localeCompare(b.date));
+        let restockInterval = 30; // Default to 30 days
+        if (incomingRecords.length >= 2) {
+          let totalDiffDays = 0;
+          for (let i = 1; i < incomingRecords.length; i++) {
+            const prevD = new Date(incomingRecords[i - 1].date);
+            const currD = new Date(incomingRecords[i].date);
+            const diffDays = Math.ceil(Math.abs(currD.getTime() - prevD.getTime()) / (1000 * 60 * 60 * 24));
+            totalDiffDays += diffDays;
+          }
+          restockInterval = Math.max(7, Math.min(60, Math.round(totalDiffDays / (incomingRecords.length - 1))));
+        }
+
+        // Safety stock threshold
+        const calculatedMinStock = velocity > 0 ? Math.ceil(velocity * restockInterval) : 0;
+        const isInsufficient = stock <= calculatedMinStock;
+
         let stockOutDate: string | null = null;
-        if (targetDaily > 0) {
-          const daysToStockOut = Math.floor(stock / targetDaily);
+        if (velocity > 0) {
+          const daysToStockOut = Math.floor(stock / velocity);
           const outDate = new Date(today);
           outDate.setDate(today.getDate() + daysToStockOut);
           stockOutDate = outDate.toISOString().split('T')[0];
@@ -200,10 +229,11 @@ function App() {
           stock,
           target: targetDaily,
           stockOutDate,
-          hasMismatch
+          hasMismatch,
+          isInsufficient
         };
       });
-  }, [data, filteredData, productMetadata, validationMismatches]);
+  }, [data, filteredData, productMetadata, validationMismatches, startDate, endDate]);
 
   const exportPDF = async () => {
     if (!dashboardRef.current) return;
@@ -211,7 +241,7 @@ function App() {
     const canvas = await html2canvas(dashboardRef.current, {
       scale: 2,
       useCORS: true,
-      backgroundColor: '#0d1117'
+      backgroundColor: '#060913'
     });
 
     const imgData = canvas.toDataURL('image/png');
@@ -340,19 +370,25 @@ function App() {
       <Header onExport={exportPDF} onRefresh={refresh} loading={loading} />
 
       {(hasInvalidData || validationMismatches.length > 0) && (
-        <div className="card mb-8" style={{ borderColor: 'var(--warning)', backgroundColor: 'rgba(210, 153, 34, 0.05)' }}>
-          <div className="flex flex-col gap-2">
-            {hasInvalidData && (
-              <p className="text-sm" style={{ color: 'var(--warning)' }}>
-                ⚠️ <strong>Data Warning:</strong> Some stock values were found to be invalid (negative) and have been excluded.
-              </p>
-            )}
-            {validationMismatches.length > 0 && (
-              <p className="text-sm" style={{ color: 'var(--warning)' }}>
-                🚨 <strong>Validation Issue:</strong> {validationMismatches.length} stock mismatch(es) detected. Expected stock (from yesterday's movement) does not match reported stock.
-              </p>
-            )}
-          </div>
+        <div className="flex flex-col gap-4 mb-8">
+          {hasInvalidData && (
+            <div className="flex items-start gap-3 p-4 bg-[#f59e0b]/10 border-l-4 border-[#f59e0b] rounded-lg text-[#fbbf24] shadow-[0_4px_12px_rgba(245,158,11,0.05)]">
+              <TriangleAlert className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-extrabold uppercase tracking-wide text-xs block mb-1">Data Warning</strong>
+                <p className="text-sm text-[#fbbf24]/90">Some stock values were found to be invalid (negative) and have been excluded from calculations.</p>
+              </div>
+            </div>
+          )}
+          {validationMismatches.length > 0 && (
+            <div className="flex items-start gap-3 p-4 bg-[#ef4444]/10 border-l-4 border-[#ef4444] rounded-lg text-[#fca5a5] shadow-[0_4px_12px_rgba(239,68,68,0.05)]">
+              <AlertOctagon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-extrabold uppercase tracking-wide text-xs block mb-1">Validation Issue</strong>
+                <p className="text-sm text-[#fca5a5]/90">{validationMismatches.length} stock mismatch(es) detected. Expected stock (from yesterday's movement) does not match reported stock.</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -393,11 +429,16 @@ function App() {
           />
         </div>
 
+        <ReplenishmentPlanner
+          data={data}
+          productMetadata={productMetadata}
+          startDate={startDate}
+          endDate={endDate}
+        />
+
         {selectedProduct !== 'All' && (
           <UnifiedForecastChart data={unifiedForecastData} productName={selectedProduct} />
         )}
-
-        <InOutChart data={inOutData} />
       </div>
 
       <footer className="mt-8 text-center text-secondary text-sm">

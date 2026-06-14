@@ -27,11 +27,11 @@ const Filters: React.FC<FiltersProps> = ({
     onEndDateChange,
 }) => {
     return (
-        <div className="card filter-grid mb-8">
-            <div className="flex flex-col gap-1">
-                <label className="text-secondary text-sm font-bold">Product</label>
+        <div className="card filter-grid mb-8 border-b border-[#334155]/60 pb-6">
+            <div className="flex flex-col gap-2">
+                <label className="text-[#94a3b8] text-[0.8rem] font-bold uppercase tracking-wider">Product</label>
                 <select
-                    className="btn"
+                    className="btn bg-[#0f172a] border border-[#334155] text-[#f1f5f9] focus:outline-none focus:border-[#3b82f6] px-3 py-2 text-xs w-full"
                     value={selectedProduct}
                     onChange={(e) => onProductChange(e.target.value)}
                 >
@@ -40,10 +40,10 @@ const Filters: React.FC<FiltersProps> = ({
                 </select>
             </div>
 
-            <div className="flex flex-col gap-1">
-                <label className="text-secondary text-sm font-bold">Size</label>
+            <div className="flex flex-col gap-2">
+                <label className="text-[#94a3b8] text-[0.8rem] font-bold uppercase tracking-wider">Size</label>
                 <select
-                    className="btn"
+                    className="btn bg-[#0f172a] border border-[#334155] text-[#f1f5f9] focus:outline-none focus:border-[#3b82f6] px-3 py-2 text-xs w-full"
                     value={selectedSize}
                     onChange={(e) => onSizeChange(e.target.value as Size | 'All')}
                 >
@@ -56,11 +56,11 @@ const Filters: React.FC<FiltersProps> = ({
                 </select>
             </div>
 
-            <div className="flex flex-col gap-1">
-                <label className="text-secondary text-sm font-bold">Start Date</label>
+            <div className="flex flex-col gap-2">
+                <label className="text-[#94a3b8] text-[0.8rem] font-bold uppercase tracking-wider">Start Date</label>
                 <input
                     type="date"
-                    className="btn"
+                    className="btn bg-[#0f172a] border border-[#334155] text-[#f1f5f9] focus:outline-none focus:border-[#3b82f6] px-3 py-2 text-xs w-full"
                     min={dateRange.min}
                     max={dateRange.max}
                     value={startDate}
@@ -68,11 +68,11 @@ const Filters: React.FC<FiltersProps> = ({
                 />
             </div>
 
-            <div className="flex flex-col gap-1">
-                <label className="text-secondary text-sm font-bold">End Date</label>
+            <div className="flex flex-col gap-2">
+                <label className="text-[#94a3b8] text-[0.8rem] font-bold uppercase tracking-wider">End Date</label>
                 <input
                     type="date"
-                    className="btn"
+                    className="btn bg-[#0f172a] border border-[#334155] text-[#f1f5f9] focus:outline-none focus:border-[#3b82f6] px-3 py-2 text-xs w-full"
                     min={dateRange.min}
                     max={dateRange.max}
                     value={endDate}

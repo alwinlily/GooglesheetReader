@@ -12,7 +12,7 @@ import {
     ReferenceLine,
     Label
 } from 'recharts';
-import { Target, Box, History, AlertTriangle } from 'lucide-react';
+import { Target, Box, History, CircleArrowDown, CirclePause } from 'lucide-react';
 
 interface UnifiedForecastChartProps {
     data: any[];
@@ -29,55 +29,52 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
         <div className="card chart-full" style={{ height: '500px' }}>
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h3 className="text-secondary text-sm font-bold uppercase tracking-wider mb-1">
+                    <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em] mb-1">
                         Unified Inventory Guide: {productName}
                     </h3>
-                    <div className="text-[10px] text-secondary italic">
-                        Strategic Alignment of Sales Targets & Stock Levels
-                    </div>
                 </div>
 
                 <div className="flex items-center gap-4">
                     {/* Compact Metrics Row */}
-                    <div className="flex items-center gap-4 bg-[#161b22] px-4 py-2 rounded-lg border border-[#30363d]">
-                        <div className="flex items-center gap-2 pr-4 border-r border-[#30363d]">
-                            <Target className="w-3.5 h-3.5 text-secondary" />
+                    <div className="flex items-center gap-4 bg-[#0f172a] px-4 py-2 rounded-lg border border-[#334155]">
+                        <div className="flex items-center gap-2 pr-4 border-r border-[#334155]">
+                            <Target className="w-3.5 h-3.5 text-[#94a3b8]" />
                             <div>
-                                <div className="text-[10px] text-secondary uppercase font-bold leading-tight">Target</div>
+                                <div className="text-[10px] text-[#64748b] uppercase font-bold leading-tight">Target</div>
                                 <div className="text-sm font-extrabold text-white leading-tight">{data[0]?.target || 0}</div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 pr-4 border-r border-[#30363d]">
-                            <Box className="w-3.5 h-3.5 text-accent-primary" />
+                        <div className="flex items-center gap-2 pr-4 border-r border-[#334155]">
+                            <Box className="w-3.5 h-3.5 text-[#3b82f6]" />
                             <div>
-                                <div className="text-[10px] text-secondary uppercase font-bold leading-tight">Stock</div>
-                                <div className="text-sm font-extrabold text-[#58a6ff] leading-tight">{data[0]?.stock || 0}</div>
+                                <div className="text-[10px] text-[#64748b] uppercase font-bold leading-tight">Stock</div>
+                                <div className="text-sm font-extrabold text-[#3b82f6] leading-tight">{data[0]?.stock || 0}</div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 pr-4 border-r border-[#30363d]">
-                            <History className="w-3.5 h-3.5 text-secondary" />
+                        <div className="flex items-center gap-2 pr-4 border-r border-[#334155]">
+                            <History className="w-3.5 h-3.5 text-[#94a3b8]" />
                             <div>
-                                <div className="text-[10px] text-secondary uppercase font-bold leading-tight">End</div>
+                                <div className="text-[10px] text-[#64748b] uppercase font-bold leading-tight">End</div>
                                 <div className="text-sm font-extrabold text-white opacity-60 leading-tight">{data[data.length - 1]?.stock || 0}</div>
                             </div>
                         </div>
 
                         {outOfStockPoint && outOfStockPoint.stock <= 0 ? (
                             <div className="flex items-center gap-2">
-                                <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                                <CircleArrowDown className="w-3.5 h-3.5 text-[#ef4444]" />
                                 <div>
-                                    <div className="text-[10px] text-red-500/70 uppercase font-bold leading-tight">Stock Out</div>
-                                    <div className="text-sm font-extrabold text-red-500 leading-tight">
+                                    <div className="text-[10px] text-[#ef4444]/70 uppercase font-bold leading-tight">Stock Out</div>
+                                    <div className="text-sm font-extrabold text-[#ef4444] leading-tight">
                                         {new Date(outOfStockPoint.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                     </div>
                                 </div>
                             </div>
                         ) : (
                             <div className="flex items-center gap-2">
-                                <AlertTriangle className="w-3.5 h-3.5 text-green-500 opacity-20" />
+                                <CirclePause className="w-3.5 h-3.5 text-[#64748b] opacity-40" />
                                 <div>
-                                    <div className="text-[10px] text-secondary/40 uppercase font-bold leading-tight">Stock Out</div>
-                                    <div className="text-sm font-extrabold text-secondary/40 leading-tight">Stable</div>
+                                    <div className="text-[10px] text-[#64748b]/40 uppercase font-bold leading-tight">Stock Out</div>
+                                    <div className="text-sm font-extrabold text-[#64748b]/40 leading-tight">Stable</div>
                                 </div>
                             </div>
                         )}
@@ -89,15 +86,15 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                 <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                     <defs>
                         <linearGradient id="colorStockUnified" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#58a6ff" stopOpacity={0.1} />
-                            <stop offset="95%" stopColor="#58a6ff" stopOpacity={0} />
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                         </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#30363d" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                     <XAxis
                         dataKey="date"
-                        stroke="#8b949e"
-                        fontSize={10}
+                        stroke="#64748b"
+                        fontSize={11}
                         tickFormatter={(str) => {
                             const date = new Date(str);
                             return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -106,20 +103,20 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                     {/* Left Y-Axis for Sales */}
                     <YAxis
                         yAxisId="left"
-                        stroke="#8b949e"
-                        fontSize={12}
-                        label={{ value: 'Sales Units', angle: -90, position: 'insideLeft', style: { fill: '#8b949e', fontSize: '10px' } }}
+                        stroke="#64748b"
+                        fontSize={11}
+                        label={{ value: 'Sales Units', angle: -90, position: 'insideLeft', style: { fill: '#64748b', fontSize: '11px' } }}
                     />
                     {/* Right Y-Axis for Stock */}
                     <YAxis
                         yAxisId="right"
                         orientation="right"
-                        stroke="#58a6ff"
-                        fontSize={12}
-                        label={{ value: 'Stock Level', angle: 90, position: 'insideRight', style: { fill: '#58a6ff', fontSize: '10px' } }}
+                        stroke="#3b82f6"
+                        fontSize={11}
+                        label={{ value: 'Stock Level', angle: 90, position: 'insideRight', style: { fill: '#3b82f6', fontSize: '11px' } }}
                     />
                     <Tooltip
-                        contentStyle={{ backgroundColor: '#161b22', borderColor: '#30363d', color: '#f0f6fc' }}
+                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f1f5f9' }}
                         itemStyle={{ fontSize: '12px' }}
                         labelFormatter={(label) => {
                             const date = new Date(label);
@@ -136,7 +133,7 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                         name="Projected Stock"
                         type="monotone"
                         dataKey="stock"
-                        stroke="#58a6ff"
+                        stroke="#3b82f6"
                         fillOpacity={1}
                         fill="url(#colorStockUnified)"
                         strokeWidth={2}
@@ -144,8 +141,8 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
 
                     {/* Reference line for Reorder (Right Axis) */}
                     {minStockValue > 0 && (
-                        <ReferenceLine yAxisId="right" y={minStockValue} stroke="#da3633" strokeDasharray="3 3">
-                            <Label value="REORDER" position="right" fill="#da3633" fontSize={10} fontWeight="bold" />
+                        <ReferenceLine yAxisId="right" y={minStockValue} stroke="#ef4444" strokeDasharray="3 3">
+                            <Label value="REORDER" position="right" fill="#ef4444" fontSize={10} fontWeight="bold" />
                         </ReferenceLine>
                     )}
 
@@ -155,7 +152,7 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                         name="Target Sales"
                         type="monotone"
                         dataKey="target"
-                        stroke="#8b949e"
+                        stroke="#94a3b8"
                         strokeWidth={2}
                         strokeDasharray="5 5"
                         dot={false}
@@ -167,15 +164,15 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                         name="Last Month Actual"
                         type="monotone"
                         dataKey="pastActual"
-                        stroke="#a371f7"
+                        stroke="#8b5cf6"
                         strokeWidth={2}
-                        dot={{ r: 3, fill: "#a371f7" }}
+                        dot={{ r: 3, fill: "#8b5cf6" }}
                         activeDot={{ r: 5 }}
                         connectNulls
                     />
                 </ComposedChart>
             </ResponsiveContainer>
-        </div >
+        </div>
     );
 };
 

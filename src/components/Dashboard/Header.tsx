@@ -9,14 +9,14 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onExport, onRefresh, loading }) => {
     return (
-        <header className="flex justify-between items-center mb-8">
+        <header className="dashboard-header">
             <div>
-                <h1 className="text-xl font-bold">Inventory Dashboard</h1>
-                <p className="text-secondary text-sm">Real-time inventory movement from Google Sheets</p>
+                <h1 className="header-title">Inventory Dashboard</h1>
+                <p className="header-subtitle">Real-time inventory movement from Google Sheets</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3 items-center">
                 <button
-                    className="btn"
+                    className="btn-header-refresh text-xs md:text-sm"
                     onClick={onRefresh}
                     disabled={loading}
                 >
@@ -24,7 +24,7 @@ const Header: React.FC<HeaderProps> = ({ onExport, onRefresh, loading }) => {
                     Refresh
                 </button>
                 <button
-                    className="btn btn-primary"
+                    className="btn-header-export text-xs md:text-sm"
                     onClick={onExport}
                 >
                     <Download className="w-4 h-4" />

@@ -28,8 +28,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         });
 
         return (
-            <div className="bg-[#161b22] border border-[#30363d] p-3 rounded-lg shadow-xl">
-                <p className="text-[#f0f6fc] text-sm font-bold mb-2">{label}</p>
+            <div className="bg-[#0f172a] border border-[#334155] p-3 rounded-lg shadow-xl">
+                <p className="text-[#f1f5f9] text-sm font-bold mb-2">{label}</p>
                 <div className="flex flex-col gap-1">
                     {sortedPayload.map((entry: any, index: number) => (
                         <div key={index} className="flex items-center justify-between gap-4 tooltip-item-bg">
@@ -49,28 +49,22 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, onMetricChange, minStock, totalAggregate }) => {
-    const colors = ["#58a6ff", "#238636", "#d29922", "#da3633", "#ab7df8"];
+    const colors = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444"];
 
     return (
         <div className="card chart-full" style={{ height: '400px' }}>
             <div className="flex justify-between items-center mb-6">
-                <h3 className="text-secondary text-sm font-bold uppercase tracking-wider">{metric} Trends</h3>
-                <div className="flex bg-[#161b22] border border-[#30363d] rounded-lg p-1 shadow-inner">
+                <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em]">{metric} Trends</h3>
+                <div className="segmented-control">
                     <button
                         onClick={() => onMetricChange('Stock')}
-                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all duration-200 ${metric === 'Stock'
-                            ? 'bg-accent-primary text-white shadow-lg scale-105'
-                            : 'text-secondary hover:text-primary hover:bg-[#30363d]'
-                            }`}
+                        className={`segmented-button ${metric === 'Stock' ? 'active' : ''}`}
                     >
                         Stock
                     </button>
                     <button
                         onClick={() => onMetricChange('Sales')}
-                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all duration-200 ${metric === 'Sales'
-                            ? 'bg-[#a371f7] text-white shadow-lg scale-105'
-                            : 'text-secondary hover:text-primary hover:bg-[#30363d]'
-                            }`}
+                        className={`segmented-button ${metric === 'Sales' ? 'active' : ''}`}
                     >
                         Sales
                     </button>
@@ -78,25 +72,25 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, 
             </div>
             <ResponsiveContainer width="100%" height="85%">
                 <LineChart data={data}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#30363d" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                     <XAxis
                         dataKey="date"
-                        stroke="#8b949e"
-                        fontSize={12}
+                        stroke="#64748b"
+                        fontSize={11}
                         tickFormatter={(str) => new Date(str).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     />
-                    <YAxis stroke="#8b949e" fontSize={12} />
+                    <YAxis stroke="#64748b" fontSize={11} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend iconType="circle" />
                     {minStock !== undefined && metric === 'Stock' && (
                         <ReferenceLine
                             y={minStock}
-                            stroke="#da3633"
+                            stroke="#ef4444"
                             strokeDasharray="3 3"
                             label={{
                                 value: `Min Stock: ${minStock}`,
                                 position: 'right',
-                                fill: '#da3633',
+                                fill: '#ef4444',
                                 fontSize: 10,
                                 fontWeight: 'bold'
                             }}
@@ -132,8 +126,8 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, 
             </ResponsiveContainer>
 
             {totalAggregate !== undefined && (
-                <div className="mt-4 pt-4 border-t border-[#30363d] flex justify-between items-center transition-all duration-300">
-                    <span className="text-secondary text-xs font-bold uppercase tracking-wider">Total {metric} for Period</span>
+                <div className="mt-4 pt-4 border-t border-[#334155] flex justify-between items-center transition-all duration-300">
+                    <span className="text-[#94a3b8] text-xs font-bold uppercase tracking-wider">Total {metric} for Period</span>
                     <span className="text-xl font-bold number-stroke">
                         {totalAggregate.toLocaleString()}
                     </span>
