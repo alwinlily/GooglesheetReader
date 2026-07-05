@@ -542,7 +542,9 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
                                         {item.minStock.toLocaleString()}
                                     </td>
                                     <td className="py-4.5 px-4 text-right col-stockout">
-                                        {item.daysToStockOut === Infinity ? (
+                                        {item.currentStock <= 0 ? (
+                                            <span className="text-[#ff6b6b] font-bold text-xs">Habis</span>
+                                        ) : item.daysToStockOut === Infinity ? (
                                             <span className="text-[#94a3b8]/50 italic font-medium text-xs">Stabil</span>
                                         ) : (
                                             <div className="flex flex-col items-end">

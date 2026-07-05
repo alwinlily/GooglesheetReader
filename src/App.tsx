@@ -9,7 +9,7 @@ import UnifiedForecastChart from './components/Charts/UnifiedForecastChart';
 import StockBreakdownChart from './components/Charts/StockBreakdownChart';
 import ReplenishmentPlanner from './components/Dashboard/ReplenishmentPlanner';
 import type { Size } from './types/inventory';
-import { TriangleAlert, AlertOctagon } from 'lucide-react';
+import { AlertOctagon } from 'lucide-react';
 import './styles/index.css';
 
 function App() {
@@ -24,12 +24,7 @@ function App() {
 
   const [selectedMetric, setSelectedMetric] = useState<'Stock' | 'Sales'>('Stock');
 
-  const [showWarningModal, setShowWarningModal] = useState(false);
   const [showValidationModal, setShowValidationModal] = useState(false);
-
-  const invalidRecords = useMemo(() => {
-    return data.filter(r => !r.validStock);
-  }, [data]);
 
   const handleBrandChange = (brand: 'Kaos Dika' | 'Marapthon') => {
     setActiveBrand(brand);
@@ -249,7 +244,7 @@ function App() {
       });
   }, [data, filteredData, productMetadata, validationMismatches, startDate, endDate]);
 
-  const hasInvalidData = useMemo(() => filteredData.some(r => !r.validStock), [filteredData]);
+
 
   const stockBreakdown = useMemo(() => {
     const breakdown: Record<string, number> = { 'S': 0, 'M': 0, 'L': 0, 'XL': 0, 'XXL': 0 };
@@ -388,42 +383,23 @@ function App() {
         </div>
       </div>
 
-      {(hasInvalidData || validationMismatches.length > 0) && (
+      {validationMismatches.length > 0 && (
         <div className="flex flex-col gap-4 mb-8">
-          {hasInvalidData && (
-            <div className="flex items-start justify-between gap-3 p-4 bg-[#f59e0b]/10 border-l-4 border-[#f59e0b] rounded-lg text-[#fbbf24] shadow-[0_4px_12px_rgba(245,158,11,0.05)]">
-              <div className="flex items-start gap-3">
-                <TriangleAlert className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                <div>
-                  <strong className="font-extrabold uppercase tracking-wide text-xs block mb-1">Data Warning</strong>
-                  <p className="text-sm text-[#fbbf24]/90">Beberapa nilai input Stock bernilai negatif (tidak valid) di Google Sheet dan telah dikecualikan.</p>
-                </div>
+          <div className="flex items-start justify-between gap-3 p-4 bg-[#ef4444]/10 border-l-4 border-[#ef4444] rounded-lg text-[#fca5a5] shadow-[0_4px_12px_rgba(239,68,68,0.05)]">
+            <div className="flex items-start gap-3">
+              <AlertOctagon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-extrabold uppercase tracking-wide text-xs block mb-1">Validation Issue</strong>
+                <p className="text-sm text-[#fca5a5]/90">{validationMismatches.length} stock mismatch(es) detected. Expected stock (from yesterday's movement) does not match reported stock.</p>
               </div>
-              <button 
-                onClick={() => setShowWarningModal(true)}
-                className="px-3 py-1.5 bg-[#f59e0b]/20 hover:bg-[#f59e0b]/35 border border-[#f59e0b]/40 hover:border-[#f59e0b]/60 text-[#fde047] font-bold text-xs rounded-lg transition-all whitespace-nowrap self-center"
-              >
-                Lihat Detail
-              </button>
             </div>
-          )}
-          {validationMismatches.length > 0 && (
-            <div className="flex items-start justify-between gap-3 p-4 bg-[#ef4444]/10 border-l-4 border-[#ef4444] rounded-lg text-[#fca5a5] shadow-[0_4px_12px_rgba(239,68,68,0.05)]">
-              <div className="flex items-start gap-3">
-                <AlertOctagon className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                <div>
-                  <strong className="font-extrabold uppercase tracking-wide text-xs block mb-1">Validation Issue</strong>
-                  <p className="text-sm text-[#fca5a5]/90">{validationMismatches.length} stock mismatch(es) detected. Expected stock (from yesterday's movement) does not match reported stock.</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setShowValidationModal(true)}
-                className="px-3 py-1.5 bg-[#ef4444]/20 hover:bg-[#ef4444]/35 border border-[#ef4444]/40 hover:border-[#ef4444]/60 text-[#fca5a5] font-bold text-xs rounded-lg transition-all whitespace-nowrap self-center"
-              >
-                Lihat Detail
-              </button>
-            </div>
-          )}
+            <button 
+              onClick={() => setShowValidationModal(true)}
+              className="px-3 py-1.5 bg-[#ef4444]/20 hover:bg-[#ef4444]/35 border border-[#ef4444]/40 hover:border-[#ef4444]/60 text-[#fca5a5] font-bold text-xs rounded-lg transition-all whitespace-nowrap self-center"
+            >
+              Lihat Detail
+            </button>
+          </div>
         </div>
       )}
 
@@ -480,53 +456,7 @@ function App() {
         <p>Report generated on {new Date().toLocaleString()}</p>
       </footer>
 
-      {/* Warning Modal */}
-      {showWarningModal && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#010409]/80 backdrop-blur-md transition-all duration-200"
-          style={{ top: 0, left: 0, right: 0, bottom: 0 }}
-        >
-          <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#334155]">
-              <div className="flex items-center gap-2 text-[#fbbf24]">
-                <TriangleAlert className="w-5 h-5" />
-                <h3 className="text-base font-bold text-[#f8fafc]">Data Warning: Negative Stock Details</h3>
-              </div>
-              <button 
-                onClick={() => setShowWarningModal(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc] text-sm font-semibold transition"
-              >
-                Tutup
-              </button>
-            </div>
-            <div className="overflow-y-auto pr-2 flex-grow">
-              <p className="text-xs text-[#94a3b8] mb-4">
-                Berikut adalah daftar baris data yang memiliki nilai Stock negatif (tidak valid) di Google Sheets Anda. Baris-baris ini telah dikecualikan dari perhitungan statistik:
-              </p>
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-[#334155] text-[#64748b] uppercase tracking-wider font-bold">
-                    <th className="py-2.5 px-3">Tanggal</th>
-                    <th className="py-2.5 px-3">Produk</th>
-                    <th className="py-2.5 px-3">Ukuran</th>
-                    <th className="py-2.5 px-3 text-right">Nilai Input</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#334155]/40 text-[#f1f5f9]">
-                  {invalidRecords.map((r, i) => (
-                    <tr key={i} className="hover:bg-[#1e293b]/60">
-                      <td className="py-2.5 px-3 font-mono">{new Date(r.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
-                      <td className="py-2.5 px-3 font-semibold">{r.product}</td>
-                      <td className="py-2.5 px-3 uppercase">{r.size}</td>
-                      <td className="py-2.5 px-3 text-right text-[#ff6b6b] font-bold">{r.rawStockValue ?? 'Negatif'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Validation Modal */}
       {showValidationModal && (

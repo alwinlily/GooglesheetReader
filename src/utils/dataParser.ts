@@ -137,14 +137,12 @@ export function parseGoogleSheetsData(rows: any[][]): InventoryRecord[] {
 
             if (mapping.metric === "Stock") {
                 productSizeGroups[key].rawStockValue = (numValue !== null && !isNaN(numValue)) ? numValue : undefined;
-                if (numValue === null) {
+                if (numValue === null || isNaN(numValue)) {
                     productSizeGroups[key].stock = null;
-                } else if (numValue < 0 || isNaN(numValue)) {
-                    productSizeGroups[key].stock = null;
-                    productSizeGroups[key].validStock = false;
                 } else {
                     productSizeGroups[key].stock = numValue;
                 }
+                productSizeGroups[key].validStock = true;
             } else if (mapping.metric === "In") {
                 productSizeGroups[key].in = (numValue !== null && !isNaN(numValue)) ? numValue : 0;
             } else if (mapping.metric === "Out") {
