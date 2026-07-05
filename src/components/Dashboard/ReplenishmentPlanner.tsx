@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, TriangleAlert, CirclePause, Calendar, CircleArrowDown, Info, TrendingDown } from 'lucide-react';
 import type { InventoryRecord, Size } from '../../types/inventory';
 import type { ProductMetadata } from '../../hooks/useInventoryData';
@@ -31,9 +31,17 @@ interface PlannerItem {
 const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, productMetadata, startDate, endDate }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'All' | ReplenishmentStatus>('All');
-    const [sortBy, setSortBy] = useState<'product' | 'stock' | 'daysToStockOut'>('daysToStockOut');
+    const [sortBy, setSortBy] = useState<'product' | 'size' | 'currentStock' | 'velocity' | 'restockInterval' | 'minStock' | 'daysToStockOut' | 'status'>('daysToStockOut');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [showExtraCols, setShowExtraCols] = useState(false);
+
+    const [pageSize, setPageSize] = useState<number>(10);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+
+    // Reset page to 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter, pageSize]);
 
     // Calculate unique product-size replenish items
     const plannerItems = useMemo(() => {
@@ -219,12 +227,12 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
     }, [plannerItems]);
 
     // Handle sort toggle
-    const handleSort = (field: 'product' | 'stock' | 'daysToStockOut') => {
+    const handleSort = (field: 'product' | 'size' | 'currentStock' | 'velocity' | 'restockInterval' | 'minStock' | 'daysToStockOut' | 'status') => {
         if (sortBy === field) {
             setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
         } else {
             setSortBy(field);
-            setSortOrder(field === 'product' ? 'asc' : 'desc');
+            setSortOrder(field === 'product' || field === 'size' || field === 'status' ? 'asc' : 'desc');
         }
     };
 
@@ -237,12 +245,19 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
                 return matchesSearch && matchesStatus;
             })
             .sort((a, b) => {
-                let valA: any = a[sortBy === 'stock' ? 'currentStock' : sortBy];
-                let valB: any = b[sortBy === 'stock' ? 'currentStock' : sortBy];
+                let valA: any = a[sortBy];
+                let valB: any = b[sortBy];
 
-                if (sortBy === 'daysToStockOut') {
+                if (sortBy === 'currentStock') {
+                    valA = a.currentStock;
+                    valB = b.currentStock;
+                } else if (sortBy === 'daysToStockOut') {
                     valA = a.daysToStockOut === Infinity ? 999999 : a.daysToStockOut;
                     valB = b.daysToStockOut === Infinity ? 999999 : b.daysToStockOut;
+                }
+
+                if (typeof valA === 'string') {
+                    return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
                 }
 
                 if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
@@ -250,6 +265,14 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
                 return 0;
             });
     }, [plannerItems, searchTerm, statusFilter, sortBy, sortOrder]);
+
+    // Paginate items
+    const paginatedItems = useMemo(() => {
+        const startIndex = (currentPage - 1) * pageSize;
+        return filteredItems.slice(startIndex, startIndex + pageSize);
+    }, [filteredItems, currentPage, pageSize]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
 
     const getStatusBadge = (status: ReplenishmentStatus) => {
         switch (status) {
@@ -446,30 +469,40 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
             <div className="overflow-x-auto border border-[#334155]/60 rounded-2xl bg-[#1e293b]/25">
                 <table className="w-full text-xs planner-table min-w-[900px]">
                     <thead>
-                        <tr className="bg-[#0f172a] text-[#64748b] text-[0.75rem] uppercase tracking-[0.06em] border-b border-[#334155]">
-                            <th className="py-3.5 px-5 text-left font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[10px] col-product" onClick={() => handleSort('product')}>
-                                Produk {sortBy === 'product' && (sortOrder === 'asc' ? '▲' : '▼')}
+                        <tr className="bg-[#0f172a] text-[#64748b] text-xs uppercase tracking-wider border-b border-[#334155]">
+                            <th className="py-4 px-5 text-left font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-product" onClick={() => handleSort('product')}>
+                                Produk {sortBy === 'product' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                             </th>
-                            <th className="py-3.5 px-3 text-center font-bold uppercase text-[10px] col-size">Ukuran</th>
-                            <th className="py-3.5 px-4 text-right font-bold cursor-pointer hover:text-white uppercase text-[10px] col-stock" onClick={() => handleSort('stock')}>
-                                Stok {sortBy === 'stock' && (sortOrder === 'asc' ? '▲' : '▼')}
+                            <th className="py-4 px-3 text-center font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-size" onClick={() => handleSort('size')}>
+                                Ukuran {sortBy === 'size' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
+                            </th>
+                            <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-stock" onClick={() => handleSort('currentStock')}>
+                                Stok {sortBy === 'currentStock' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                             </th>
                             {showExtraCols && (
                                 <>
-                                    <th className="py-3.5 px-4 text-right font-bold uppercase text-[10px] col-velocity">Laju Jual / Hari</th>
-                                    <th className="py-3.5 px-4 text-right font-bold uppercase text-[10px] col-cycle">Siklus Restok</th>
+                                    <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-velocity" onClick={() => handleSort('velocity')}>
+                                        Laju Jual {sortBy === 'velocity' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
+                                    </th>
+                                    <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-cycle" onClick={() => handleSort('restockInterval')}>
+                                        Siklus {sortBy === 'restockInterval' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
+                                    </th>
                                 </>
                             )}
-                            <th className="py-3.5 px-4 text-right font-bold uppercase text-[10px] col-min-stock">Stok Min Aman</th>
-                            <th className="py-3.5 px-4 text-right font-bold cursor-pointer hover:text-white uppercase text-[10px] col-stockout" onClick={() => handleSort('daysToStockOut')}>
-                                Estimasi Habis {sortBy === 'daysToStockOut' && (sortOrder === 'asc' ? '▲' : '▼')}
+                            <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-min-stock" onClick={() => handleSort('minStock')}>
+                                Stok Min Aman {sortBy === 'minStock' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                             </th>
-                            <th className="py-3.5 px-4 text-center font-bold uppercase text-[10px] col-status">Status Indikator</th>
-                            <th className="py-3.5 px-5 text-left font-bold uppercase text-[10px] col-recommendation">Rekomendasi Rencana Pemesanan (Aksi & Estimasi Tanggal)</th>
+                            <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-stockout" onClick={() => handleSort('daysToStockOut')}>
+                                Estimasi Habis {sortBy === 'daysToStockOut' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
+                            </th>
+                            <th className="py-4 px-4 text-center font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-status" onClick={() => handleSort('status')}>
+                                Status Indikator {sortBy === 'status' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
+                            </th>
+                            <th className="py-4 px-5 text-left font-bold uppercase text-[11px] col-recommendation">Rekomendasi Rencana Pemesanan (Aksi & Estimasi Tanggal)</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-[#334155]/40">
-                        {filteredItems.map(item => {
+                        {paginatedItems.map(item => {
                             const showProgress = item.daysToStockOut !== Infinity && item.daysToStockOut > 0;
                             const progressWidth = showProgress ? Math.min(100, (item.daysToStockOut / 120) * 100) : 0;
                             
@@ -480,40 +513,40 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
                             } else if (item.status === 'Out of Stock') {
                                 barColorClass = 'bg-[#ef4444]';
                             }
-
+ 
                             return (
                                 <tr key={`${item.product}-${item.size}`}>
-                                    <td className="py-4 px-5 font-bold text-white text-sm col-product">
+                                    <td className="py-4.5 px-5 font-bold text-white text-sm col-product">
                                         {item.product}
                                     </td>
-                                    <td className="py-4 px-3 text-center col-size">
+                                    <td className="py-4.5 px-3 text-center col-size">
                                         <span className="px-2.5 py-1 rounded bg-[#334155]/45 text-[#cbd5e1] text-[11px] font-black border border-[#334155]">
                                             {item.size}
                                         </span>
                                     </td>
-                                    <td className="py-4 px-4 text-right font-extrabold text-white font-numeric text-sm col-stock">
+                                    <td className="py-4.5 px-4 text-right font-extrabold text-white font-numeric text-sm col-stock">
                                         {item.currentStock.toLocaleString()}
                                     </td>
                                     {showExtraCols && (
                                         <>
-                                            <td className="py-4 px-4 text-right text-[#94a3b8] font-numeric font-medium text-sm col-velocity">
+                                            <td className="py-4.5 px-4 text-right text-[#94a3b8] font-numeric font-medium text-sm col-velocity">
                                                 {item.velocity.toFixed(2)}
                                                 <span className="text-[10px] text-[#94a3b8]/40 block font-normal tracking-wide">(Riil)</span>
                                             </td>
-                                            <td className="py-4 px-4 text-right text-white font-numeric font-semibold text-xs col-cycle">
+                                            <td className="py-4.5 px-4 text-right text-white font-numeric font-semibold text-xs col-cycle">
                                                 {item.restockInterval} Hari
                                             </td>
                                         </>
                                     )}
-                                    <td className="py-4 px-4 text-right text-[#3b82f6] font-numeric font-extrabold text-sm col-min-stock">
+                                    <td className="py-4.5 px-4 text-right text-[#3b82f6] font-numeric font-extrabold text-sm col-min-stock">
                                         {item.minStock.toLocaleString()}
                                     </td>
-                                    <td className="py-4 px-4 text-right col-stockout">
+                                    <td className="py-4.5 px-4 text-right col-stockout">
                                         {item.daysToStockOut === Infinity ? (
-                                            <span className="text-[#94a3b8]/50 italic font-medium">Stabil</span>
+                                            <span className="text-[#94a3b8]/50 italic font-medium text-xs">Stabil</span>
                                         ) : (
                                             <div className="flex flex-col items-end">
-                                                <span className={`font-black font-numeric text-sm ${item.status === 'Order Soon' ? 'text-[#f59e0b]' : 'text-[#10b981]'}`}>
+                                                <span className={`font-black font-numeric text-[0.875rem] ${item.status === 'Order Soon' ? 'text-[#fbbf24]' : 'text-[#4ade80]'}`}>
                                                     {Math.round(item.daysToStockOut)} Hari
                                                 </span>
                                                 <div className="w-16 h-1.5 bg-[#0f172a] rounded-full overflow-hidden mt-1.5 border border-[#334155]/40">
@@ -522,12 +555,12 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
                                             </div>
                                         )}
                                     </td>
-                                    <td className="py-4 px-4 text-center col-status">
+                                    <td className="py-4.5 px-4 text-center col-status">
                                         <div className="flex justify-center">
                                             {getStatusBadge(item.status)}
                                         </div>
                                     </td>
-                                    <td className="py-4 px-5 text-left col-recommendation">
+                                    <td className="py-4.5 px-5 text-left col-recommendation">
                                         <div 
                                             title={item.suggestion}
                                             className={`p-2.5 rounded-xl border leading-relaxed text-xs shadow-sm flex items-center gap-2 w-full ${
@@ -539,11 +572,11 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
                                         >
                                             <div className="flex-shrink-0">
                                                 {item.status === 'Out of Stock' ? (
-                                                    <CircleArrowDown className="w-3.5 h-3.5 text-[#ef4444] flex-shrink-0" />
+                                                    <CircleArrowDown className="w-3.5 h-3.5 text-[#ff6b6b] flex-shrink-0" />
                                                 ) : item.status === 'Order Soon' ? (
-                                                    <TriangleAlert className="w-3.5 h-3.5 animate-bounce text-[#f59e0b] flex-shrink-0" />
+                                                    <TriangleAlert className="w-3.5 h-3.5 animate-bounce text-[#fbbf24] flex-shrink-0" />
                                                 ) : item.status === 'Hold Order' ? (
-                                                    <Info className="w-3.5 h-3.5 text-[#3b82f6] flex-shrink-0" />
+                                                    <Info className="w-3.5 h-3.5 text-[#60a5fa] flex-shrink-0" />
                                                 ) : (
                                                     <CirclePause className="w-3.5 h-3.5 text-[#64748b] flex-shrink-0" />
                                                 )}
@@ -564,6 +597,67 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination Controls */}
+            {filteredItems.length > 0 && (
+                <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4 bg-[#1e293b]/30 p-4 rounded-2xl border border-[#334155]/40 text-xs text-[#94a3b8]">
+                    <div className="flex items-center gap-3">
+                        <span>Tampilkan</span>
+                        <select
+                            className="bg-[#0f172a] border border-[#334155] text-white rounded-lg px-2.5 py-1 focus:outline-none focus:border-[#3b82f6]"
+                            value={pageSize}
+                            onChange={(e) => {
+                                setPageSize(Number(e.target.value));
+                                setCurrentPage(1);
+                            }}
+                        >
+                            <option value={10}>10 Baris</option>
+                            <option value={25}>25 Baris</option>
+                            <option value={50}>50 Baris</option>
+                            <option value={100}>100 Baris</option>
+                        </select>
+                        <span>
+                            Menampilkan {Math.min(filteredItems.length, (currentPage - 1) * pageSize + 1)} - {Math.min(filteredItems.length, currentPage * pageSize)} dari {filteredItems.length} item
+                        </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-1">
+                        <button
+                            className="btn py-1 px-2.5 bg-[#0f172a] border border-[#334155] rounded-lg text-[#94a3b8] hover:text-white disabled:opacity-40 disabled:pointer-events-none"
+                            onClick={() => setCurrentPage(1)}
+                            disabled={currentPage === 1}
+                        >
+                            « First
+                        </button>
+                        <button
+                            className="btn py-1 px-2.5 bg-[#0f172a] border border-[#334155] rounded-lg text-[#94a3b8] hover:text-white disabled:opacity-40 disabled:pointer-events-none"
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                        >
+                            ‹ Prev
+                        </button>
+                        
+                        <div className="flex items-center gap-1 font-bold text-white px-2">
+                            <span>Halaman {currentPage} dari {totalPages}</span>
+                        </div>
+
+                        <button
+                            className="btn py-1 px-2.5 bg-[#0f172a] border border-[#334155] rounded-lg text-[#94a3b8] hover:text-white disabled:opacity-40 disabled:pointer-events-none"
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages}
+                        >
+                            Next ›
+                        </button>
+                        <button
+                            className="btn py-1 px-2.5 bg-[#0f172a] border border-[#334155] rounded-lg text-[#94a3b8] hover:text-white disabled:opacity-40 disabled:pointer-events-none"
+                            onClick={() => setCurrentPage(totalPages)}
+                            disabled={currentPage === totalPages}
+                        >
+                            Last »
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Premium Info Legend Card */}
             <div className="mt-6 p-4 bg-white/[0.02] border border-[#334155]/60 rounded-2xl flex items-start gap-3 text-xs text-[#94a3b8] leading-relaxed">

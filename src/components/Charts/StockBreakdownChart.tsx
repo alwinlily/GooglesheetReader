@@ -7,7 +7,8 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    Cell
+    Cell,
+    LabelList
 } from 'recharts';
 import { Layers } from 'lucide-react';
 
@@ -30,7 +31,7 @@ const StockBreakdownChart: React.FC<StockBreakdownProps> = ({ data }) => {
                     <BarChart
                         data={data}
                         layout="vertical"
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                        margin={{ top: 5, right: 45, left: 10, bottom: 5 }}
                     >
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" horizontal={false} />
                         <XAxis type="number" stroke="#64748b" fontSize={11} hide />
@@ -39,7 +40,7 @@ const StockBreakdownChart: React.FC<StockBreakdownProps> = ({ data }) => {
                             type="category"
                             stroke="#64748b"
                             fontSize={11}
-                            width={40}
+                            width={35}
                             axisLine={false}
                             tickLine={false}
                         />
@@ -57,20 +58,28 @@ const StockBreakdownChart: React.FC<StockBreakdownProps> = ({ data }) => {
                             {data.map((_, index) => (
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length] || COLORS[0]} />
                             ))}
+                            <LabelList 
+                                dataKey="stock" 
+                                position="right" 
+                                fill="#94a3b8" 
+                                fontSize={10} 
+                                formatter={(v: any) => Number(v).toLocaleString()}
+                                offset={8}
+                            />
                         </Bar>
                     </BarChart>
                 </ResponsiveContainer>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-6 flex flex-col gap-2.5">
                 {data.map((item, index) => (
-                    <div key={item.size} className="flex items-center gap-2">
+                    <div key={item.size} className="flex items-center gap-2 border-b border-[#334155]/20 pb-2 last:border-0">
                         <div
-                            className="w-2 h-2 rounded-full"
+                            className="w-2.5 h-2.5 rounded-full"
                             style={{ backgroundColor: COLORS[index % COLORS.length] }}
                         />
-                        <span className="text-[10px] text-[#94a3b8] font-bold uppercase">{item.size}</span>
-                        <span className="text-[10px] text-white font-extrabold ml-auto">{item.stock.toLocaleString()}</span>
+                        <span className="text-xs text-[#94a3b8] font-bold uppercase">Ukuran {item.size}</span>
+                        <span className="text-xs text-[#f1f5f9] font-extrabold ml-auto">{item.stock.toLocaleString()} Units</span>
                     </div>
                 ))}
             </div>

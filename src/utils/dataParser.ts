@@ -136,6 +136,7 @@ export function parseGoogleSheetsData(rows: any[][]): InventoryRecord[] {
             const numValue = rawValue === undefined || rawValue === "" ? null : Number(rawValue);
 
             if (mapping.metric === "Stock") {
+                productSizeGroups[key].rawStockValue = (numValue !== null && !isNaN(numValue)) ? numValue : undefined;
                 if (numValue === null) {
                     productSizeGroups[key].stock = null;
                 } else if (numValue < 0 || isNaN(numValue)) {

@@ -627,3 +627,13 @@ body {
 .col-recommendation {
   min-width: 350px;
 }
+
+/* Recharts legend interactive indicator */
+.recharts-legend-item {
+  cursor: pointer !important;
+  user-select: none;
+  transition: opacity 0.2s ease;
+}
+.recharts-legend-item:hover {
+  opacity: 0.7;
+}

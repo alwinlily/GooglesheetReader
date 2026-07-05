@@ -10,6 +10,7 @@ export interface InventoryRecord {
   out: number;
   validStock: boolean;
   isReturn: boolean;
+  rawStockValue?: number;
 }
 
 export interface RawHeaderMapping {

@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 
 interface StockTrendChartProps {
@@ -50,6 +51,15 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, onMetricChange, minStock, totalAggregate }) => {
     const colors = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444"];
+    const [hiddenSizes, setHiddenSizes] = useState<Record<string, boolean>>({});
+
+    const handleLegendClick = (e: any) => {
+        const { dataKey } = e;
+        setHiddenSizes(prev => ({
+            ...prev,
+            [dataKey]: !prev[dataKey]
+        }));
+    };
 
     return (
         <div className="card chart-full" style={{ height: '400px' }}>
@@ -81,7 +91,7 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, 
                     />
                     <YAxis stroke="#64748b" fontSize={11} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Legend iconType="circle" />
+                    <Legend iconType="circle" onClick={handleLegendClick} />
                     {minStock !== undefined && metric === 'Stock' && (
                         <ReferenceLine
                             y={minStock}
@@ -106,6 +116,7 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, 
                             dot={{ r: 4, fill: colors[index % colors.length] }}
                             activeDot={{ r: 6 }}
                             connectNulls={false} // Gap for missing stock as per PRD
+                            hide={!!hiddenSizes[size]}
                         />
                     ))}
                     {data.length > 0 && 'total' in data[0] && (
@@ -120,6 +131,7 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({ data, sizes, metric, 
                             activeDot={{ r: 8 }}
                             connectNulls={true}
                             opacity={0.8}
+                            hide={!!hiddenSizes['total']}
                         />
                     )}
                 </LineChart>
