@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import type { InventoryRecord } from "../types/inventory";
 import { parseGoogleSheetsData } from "../utils/dataParser";
-import { MOCK_SHEET_DATA } from "../utils/mockData";
+import { MOCK_SHEET_DATA, MOCK_MARAPTHON_SHEET_DATA, MOCK_MARAPTHON_MASTER_SHEET } from "../utils/mockData";
 
 export interface ProductMetadata {
     minStock: number;
     targetSalesDaily: number;
 }
 
-export function useInventoryData() {
+export function useInventoryData(brand: "Kaos Dika" | "Marapthon") {
     const [data, setData] = useState<InventoryRecord[]>([]);
     const [productMetadata, setProductMetadata] = useState<Record<string, Record<string, ProductMetadata>>>({});
     const [loading, setLoading] = useState(true);
@@ -22,16 +22,55 @@ export function useInventoryData() {
             const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
 
             if (!sheetId || !apiKey) {
-                // If keys are missing, we can still fall back to mock data or show a specific error
-                // For now, let's fall back to mock data but warn in console
                 console.warn("VITE_SHEET_ID or VITE_GOOGLE_API_KEY is missing. Falling back to mock data.");
-                const parsed = parseGoogleSheetsData(MOCK_SHEET_DATA);
+                const parsed = parseGoogleSheetsData(brand === "Kaos Dika" ? MOCK_SHEET_DATA : MOCK_MARAPTHON_SHEET_DATA);
                 setData(parsed);
+
+                // Populate mock metadata based on brand
+                const metadataMap: Record<string, Record<string, ProductMetadata>> = {};
+                if (brand === "Marapthon") {
+                    const masterValues = MOCK_MARAPTHON_MASTER_SHEET;
+                    const headers = masterValues[0].map(h => String(h).trim().toLowerCase());
+                    const productColIndex = headers.findIndex((h) => h === "item name" || h === "edisi" || h === "produk");
+                    const sizeColIndex = headers.findIndex((h) => h === "size" || h === "ukuran");
+                    const minStockColIndex = headers.findIndex((h) => h === "min stock" || h === "min_stock");
+                    const targetSalesColIndex = headers.findIndex((h) => h === "target sales daily" || h === "target sales" || h === "target_sales");
+
+                    masterValues.slice(1).forEach((row: any[]) => {
+                        const productName = productColIndex !== -1 ? row[productColIndex] : null;
+                        const size = sizeColIndex !== -1 ? (row[sizeColIndex] as string) : null;
+                        const minStock = minStockColIndex !== -1 ? parseFloat(row[minStockColIndex]) : 0;
+                        const targetSalesDaily = targetSalesColIndex !== -1 ? parseFloat(row[targetSalesColIndex]) : 0;
+
+                        if (productName && size) {
+                            const trimmedProduct = String(productName).trim();
+                            const trimmedSize = String(size).trim();
+                            if (!metadataMap[trimmedProduct]) {
+                                metadataMap[trimmedProduct] = {};
+                            }
+                            metadataMap[trimmedProduct][trimmedSize] = {
+                                minStock: isNaN(minStock) ? 0 : minStock,
+                                targetSalesDaily: isNaN(targetSalesDaily) ? 0 : targetSalesDaily
+                            };
+                        }
+                    });
+                } else {
+                    parsed.forEach(record => {
+                        if (!metadataMap[record.product]) {
+                            metadataMap[record.product] = {};
+                        }
+                        metadataMap[record.product][record.size] = {
+                            minStock: 20,
+                            targetSalesDaily: 2
+                        };
+                    });
+                }
+                setProductMetadata(metadataMap);
                 return;
             }
 
-            const dailyRange = "Invetory Daily!A1:ZZ1000";
-            const masterRange = "Inventory_Master!A1:H100";
+            const dailyRange = brand === "Kaos Dika" ? "Invetory Daily!A1:ZZ1000" : "Daily Marapthon!A1:ZZ1000";
+            const masterRange = brand === "Kaos Dika" ? "Inventory_Master!A1:H100" : "Master Marapthon!A1:H100";
 
             const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchGet?ranges=${encodeURIComponent(dailyRange)}&ranges=${encodeURIComponent(masterRange)}&key=${apiKey}`;
 
@@ -58,20 +97,28 @@ export function useInventoryData() {
             const parsed = parseGoogleSheetsData(dailyValues);
             setData(parsed);
 
-            // Parse Metadata from Master Sheet (Col C: Name, Col E: Size, Col G: Min Stock, Col H: Daily Target)
+            // Parse Metadata dynamically from Master Sheet
             const metadataMap: Record<string, Record<string, ProductMetadata>> = {};
-            if (masterValues) {
+            if (masterValues && masterValues.length > 0) {
+                const headers = masterValues[0].map((h: any) => String(h).trim().toLowerCase());
+                const productColIndex = headers.findIndex((h: string) => h === "item name" || h === "edisi" || h === "produk");
+                const sizeColIndex = headers.findIndex((h: string) => h === "size" || h === "ukuran");
+                const minStockColIndex = headers.findIndex((h: string) => h === "min stock" || h === "min_stock");
+                const targetSalesColIndex = headers.findIndex((h: string) => h === "target sales daily" || h === "target sales" || h === "target_sales");
+
                 masterValues.slice(1).forEach((row: any[]) => {
-                    const productName = row[2]; // Column C
-                    const size = row[4] as string; // Column E
-                    const minStock = parseFloat(row[6]); // Column G
-                    const targetSalesDaily = parseFloat(row[7]); // Column H
+                    const productName = productColIndex !== -1 ? row[productColIndex] : null;
+                    const size = sizeColIndex !== -1 ? (row[sizeColIndex] as string) : null;
+                    const minStock = minStockColIndex !== -1 ? parseFloat(row[minStockColIndex]) : 0;
+                    const targetSalesDaily = targetSalesColIndex !== -1 ? parseFloat(row[targetSalesColIndex]) : 0;
 
                     if (productName && size) {
-                        if (!metadataMap[productName]) {
-                            metadataMap[productName] = {};
+                        const trimmedProduct = String(productName).trim();
+                        const trimmedSize = String(size).trim();
+                        if (!metadataMap[trimmedProduct]) {
+                            metadataMap[trimmedProduct] = {};
                         }
-                        metadataMap[productName][size] = {
+                        metadataMap[trimmedProduct][trimmedSize] = {
                             minStock: isNaN(minStock) ? 0 : minStock,
                             targetSalesDaily: isNaN(targetSalesDaily) ? 0 : targetSalesDaily
                         };
@@ -89,7 +136,7 @@ export function useInventoryData() {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [brand]);
 
     const products = useMemo(() => {
         return Array.from(new Set(data.map((r) => r.product)));

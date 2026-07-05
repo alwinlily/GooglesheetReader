@@ -15,7 +15,8 @@ import { jsPDF } from 'jspdf';
 import './styles/index.css';
 
 function App() {
-  const { data, productMetadata, loading, error, products, dateRange, refresh } = useInventoryData();
+  const [activeBrand, setActiveBrand] = useState<'Kaos Dika' | 'Marapthon'>('Kaos Dika');
+  const { data, productMetadata, loading, error, products, dateRange, refresh } = useInventoryData(activeBrand);
   const dashboardRef = useRef<HTMLDivElement>(null);
 
   const [selectedProduct, setSelectedProduct] = useState('All');
@@ -25,9 +26,17 @@ function App() {
 
   const [selectedMetric, setSelectedMetric] = useState<'Stock' | 'Sales'>('Stock');
 
+  const handleBrandChange = (brand: 'Kaos Dika' | 'Marapthon') => {
+    setActiveBrand(brand);
+    setSelectedProduct('All');
+    setSelectedSize('All');
+    setStartDate('');
+    setEndDate('');
+  };
+
   // Set default dates once data is loaded
   React.useEffect(() => {
-    if (dateRange.min && !startDate) {
+    if (dateRange.min) {
       setStartDate(dateRange.min);
       setEndDate(dateRange.max);
     }
@@ -368,6 +377,30 @@ function App() {
   return (
     <div className="dashboard-container" ref={dashboardRef}>
       <Header onExport={exportPDF} onRefresh={refresh} loading={loading} />
+
+      <div className="flex justify-between items-center mb-6 bg-[#1e293b] p-4 rounded-xl border border-[#334155]">
+        <div className="flex flex-col gap-1">
+          <span className="text-[0.7rem] uppercase tracking-wider text-[#94a3b8] font-bold">Active Brand</span>
+          <div className="segmented-control">
+            <button
+              className={`segmented-button ${activeBrand === 'Kaos Dika' ? 'active' : ''}`}
+              onClick={() => handleBrandChange('Kaos Dika')}
+            >
+              Kaos Dika
+            </button>
+            <button
+              className={`segmented-button ${activeBrand === 'Marapthon' ? 'active' : ''}`}
+              onClick={() => handleBrandChange('Marapthon')}
+            >
+              Marapthon
+            </button>
+          </div>
+        </div>
+        <div className="text-right hidden sm:block">
+          <span className="text-xs text-[#64748b]">Showing analysis for brand:</span>
+          <strong className="text-sm text-[#f1f5f9] block">{activeBrand}</strong>
+        </div>
+      </div>
 
       {(hasInvalidData || validationMismatches.length > 0) && (
         <div className="flex flex-col gap-4 mb-8">

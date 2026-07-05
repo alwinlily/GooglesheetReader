@@ -43,11 +43,12 @@ export function parseGoogleSheetsData(rows: any[][]): InventoryRecord[] {
         }
 
         let metric: Metric | null = null;
-        if (rawMetric === "S" || rawMetric === "Stock") {
+        const normalizedMetric = rawMetric.toLowerCase();
+        if (normalizedMetric === "s" || normalizedMetric === "stock") {
             metric = "Stock";
-        } else if (rawMetric === "In") {
+        } else if (normalizedMetric === "in") {
             metric = "In";
-        } else if (rawMetric === "Out") {
+        } else if (normalizedMetric === "out") {
             metric = "Out";
         }
 
@@ -61,10 +62,11 @@ export function parseGoogleSheetsData(rows: any[][]): InventoryRecord[] {
         }
     }
 
-    // Find the Note column. Usually column FM (index 168) but search for 'Note' to be safe.
+    // Find the Note column. Usually column FM (index 168) but search for 'Note' or 'Keterangan' to be safe.
     let noteColumnIndex = -1;
     for (let i = 0; i < row1.length; i++) {
-        if (String(row1[i]).trim().toLowerCase() === "note") {
+        const val = String(row1[i]).trim().toLowerCase();
+        if (val === "note" || val === "keterangan") {
             noteColumnIndex = i;
             break;
         }
@@ -82,15 +84,35 @@ export function parseGoogleSheetsData(rows: any[][]): InventoryRecord[] {
     const records: InventoryRecord[] = [];
     const dataRows = rows.slice(2);
 
+    // Detect date format dynamically (DD/MM/YYYY vs MM/DD/YYYY)
+    let dateFormat: "DD/MM/YYYY" | "MM/DD/YYYY" = "MM/DD/YYYY";
+    for (const row of dataRows) {
+        const rawDate = row[0];
+        if (!rawDate) continue;
+        const parts = String(rawDate).split("/");
+        if (parts.length === 3) {
+            const p0 = Number(parts[0]);
+            const p1 = Number(parts[1]);
+            if (!isNaN(p0) && p0 > 12 && p0 <= 31) {
+                dateFormat = "DD/MM/YYYY";
+                break;
+            }
+            if (!isNaN(p1) && p1 > 12 && p1 <= 31) {
+                dateFormat = "MM/DD/YYYY";
+                break;
+            }
+        }
+    }
+
     for (const row of dataRows) {
         const rawDate = row[0];
         if (!rawDate) continue;
 
-        const isoDate = parseDate(rawDate);
+        const isoDate = parseDate(rawDate, dateFormat);
         if (!isoDate) continue;
 
-        const isReturn = noteColumnIndex !== -1 && row[Math.min(noteColumnIndex, row.length - 1)]
-            ? String(row[Math.min(noteColumnIndex, row.length - 1)]).trim().toLowerCase() === "return"
+        const isReturn = noteColumnIndex !== -1 && noteColumnIndex < row.length && row[noteColumnIndex]
+            ? String(row[noteColumnIndex]).trim().toLowerCase() === "return"
             : false;
 
         const productSizeGroups: Record<string, Partial<InventoryRecord>> = {};
@@ -137,14 +159,22 @@ export function parseGoogleSheetsData(rows: any[][]): InventoryRecord[] {
     return records;
 }
 
-function parseDate(rawDate: string): string | null {
+function parseDate(rawDate: string, dateFormat: "DD/MM/YYYY" | "MM/DD/YYYY" = "MM/DD/YYYY"): string | null {
     const parts = rawDate.split("/");
     if (parts.length !== 3) return null;
 
-    const month = parts[0].padStart(2, "0");
-    const day = parts[1].padStart(2, "0");
-    let year = parts[2];
+    let month = "";
+    let day = "";
 
+    if (dateFormat === "DD/MM/YYYY") {
+        day = parts[0].padStart(2, "0");
+        month = parts[1].padStart(2, "0");
+    } else {
+        month = parts[0].padStart(2, "0");
+        day = parts[1].padStart(2, "0");
+    }
+
+    let year = parts[2];
     if (year.length === 2) {
         year = "20" + year;
     }
