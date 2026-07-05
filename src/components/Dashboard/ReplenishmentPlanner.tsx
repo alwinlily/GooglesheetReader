@@ -310,8 +310,8 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
     return (
         <div className="glass-card w-full shadow-soft relative overflow-hidden border border-[#334155]/80">
             {/* Visual glow blobs in background */}
-            <div className="absolute top-0 right-0 w-80 h-80 bg-[#3b82f6]/5 rounded-full blur-3xl -z-10 pointer-events-none"></div>
-            <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#8b5cf6]/5 rounded-full blur-3xl -z-10 pointer-events-none"></div>
+            <div className="absolute top-0 right-0 w-80 h-80 bg-[#3b82f6]/5 rounded-full blur-3xl -z-10 pointer-events-none" style={{ top: 0, right: 0 }}></div>
+            <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#8b5cf6]/5 rounded-full blur-3xl -z-10 pointer-events-none" style={{ bottom: 0, left: 0 }}></div>
 
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-[#334155]/40 pb-5">

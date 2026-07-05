@@ -482,7 +482,10 @@ function App() {
 
       {/* Warning Modal */}
       {showWarningModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#010409]/80 backdrop-blur-md transition-all duration-200">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#010409]/80 backdrop-blur-md transition-all duration-200"
+          style={{ top: 0, left: 0, right: 0, bottom: 0 }}
+        >
           <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#334155]">
               <div className="flex items-center gap-2 text-[#fbbf24]">
@@ -527,7 +530,10 @@ function App() {
 
       {/* Validation Modal */}
       {showValidationModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#010409]/80 backdrop-blur-md transition-all duration-200">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#010409]/80 backdrop-blur-md transition-all duration-200"
+          style={{ top: 0, left: 0, right: 0, bottom: 0 }}
+        >
           <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-6 w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#334155]">
               <div className="flex items-center gap-2 text-[#ff6b6b]">
