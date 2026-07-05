@@ -10,8 +10,6 @@ import StockBreakdownChart from './components/Charts/StockBreakdownChart';
 import ReplenishmentPlanner from './components/Dashboard/ReplenishmentPlanner';
 import type { Size } from './types/inventory';
 import { TriangleAlert, AlertOctagon } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import './styles/index.css';
 
 function App() {
@@ -244,25 +242,6 @@ function App() {
       });
   }, [data, filteredData, productMetadata, validationMismatches, startDate, endDate]);
 
-  const exportPDF = async () => {
-    if (!dashboardRef.current) return;
-
-    const canvas = await html2canvas(dashboardRef.current, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#060913'
-    });
-
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('l', 'mm', 'a4');
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`inventory-report-${new Date().toISOString().split('T')[0]}.pdf`);
-  };
-
   const hasInvalidData = useMemo(() => filteredData.some(r => !r.validStock), [filteredData]);
 
   const stockBreakdown = useMemo(() => {
@@ -376,7 +355,7 @@ function App() {
 
   return (
     <div className="dashboard-container" ref={dashboardRef}>
-      <Header onExport={exportPDF} onRefresh={refresh} loading={loading} />
+      <Header onRefresh={refresh} loading={loading} />
 
       <div className="flex justify-between items-center mb-6 bg-[#1e293b] p-4 rounded-xl border border-[#334155]">
         <div className="flex flex-col gap-1">
