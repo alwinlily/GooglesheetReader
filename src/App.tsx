@@ -25,6 +25,8 @@ function App() {
   const [selectedMetric, setSelectedMetric] = useState<'Stock' | 'Sales'>('Stock');
 
   const [showValidationModal, setShowValidationModal] = useState(false);
+  const [modalSortColumn, setModalSortColumn] = useState<'date' | 'product' | 'difference'>('difference');
+  const [modalSortDirection, setModalSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const handleBrandChange = (brand: 'Kaos Dika' | 'Marapthon') => {
     setActiveBrand(brand);
@@ -147,6 +149,45 @@ function App() {
 
     return mismatches;
   }, [data]);
+
+  const sortedValidationMismatches = useMemo(() => {
+    const list = [...validationMismatches];
+    list.sort((a, b) => {
+      let valA: any;
+      let valB: any;
+
+      if (modalSortColumn === 'date') {
+        valA = a.date;
+        valB = b.date;
+      } else if (modalSortColumn === 'product') {
+        valA = a.product;
+        valB = b.product;
+      } else { // difference
+        valA = Math.abs(a.actual - a.expected);
+        valB = Math.abs(b.actual - b.expected);
+      }
+
+      if (typeof valA === 'string') {
+        return modalSortDirection === 'asc' 
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      } else {
+        return modalSortDirection === 'asc'
+          ? valA - valB
+          : valB - valA;
+      }
+    });
+    return list;
+  }, [validationMismatches, modalSortColumn, modalSortDirection]);
+
+  const handleModalSort = (column: 'date' | 'product' | 'difference') => {
+    if (modalSortColumn === column) {
+      setModalSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setModalSortColumn(column);
+      setModalSortDirection(column === 'difference' ? 'desc' : 'asc');
+    }
+  };
 
   const topSalesData = useMemo(() => {
     const salesMap: Record<string, { product: string; size: string; sales: number }> = {};
@@ -484,16 +525,31 @@ function App() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[#334155] text-[#64748b] uppercase tracking-wider font-bold">
-                    <th className="py-2.5 px-3">Tanggal</th>
-                    <th className="py-2.5 px-3">Produk</th>
+                    <th 
+                      onClick={() => handleModalSort('date')}
+                      className="py-2.5 px-3 cursor-pointer select-none hover:text-[#f1f5f9] transition-colors duration-150"
+                    >
+                      Tanggal {modalSortColumn === 'date' && (modalSortDirection === 'asc' ? ' ▲' : ' ▼')}
+                    </th>
+                    <th 
+                      onClick={() => handleModalSort('product')}
+                      className="py-2.5 px-3 cursor-pointer select-none hover:text-[#f1f5f9] transition-colors duration-150"
+                    >
+                      Produk {modalSortColumn === 'product' && (modalSortDirection === 'asc' ? ' ▲' : ' ▼')}
+                    </th>
                     <th className="py-2.5 px-3">Ukuran</th>
                     <th className="py-2.5 px-3 text-right">Ekspektasi</th>
                     <th className="py-2.5 px-3 text-right">Aktual</th>
-                    <th className="py-2.5 px-3 text-right">Selisih</th>
+                    <th 
+                      onClick={() => handleModalSort('difference')}
+                      className="py-2.5 px-3 text-right cursor-pointer select-none hover:text-[#f1f5f9] transition-colors duration-150"
+                    >
+                      Selisih {modalSortColumn === 'difference' && (modalSortDirection === 'asc' ? ' ▲' : ' ▼')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#334155]/40 text-[#f1f5f9]">
-                  {validationMismatches.map((m, i) => (
+                  {sortedValidationMismatches.map((m, i) => (
                     <tr key={i} className="hover:bg-[#1e293b]/60">
                       <td className="py-2.5 px-3 font-mono">{new Date(m.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
                       <td className="py-2.5 px-3 font-semibold">{m.product}</td>
