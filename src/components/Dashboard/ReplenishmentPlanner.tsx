@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Search, TriangleAlert, CirclePause, Calendar, CircleArrowDown, Info, TrendingDown } from 'lucide-react';
 import type { InventoryRecord, Size } from '../../types/inventory';
 import type { ProductMetadata } from '../../hooks/useInventoryData';
@@ -38,10 +38,16 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
     const [pageSize, setPageSize] = useState<number>(10);
     const [currentPage, setCurrentPage] = useState<number>(1);
 
-    // Reset page to 1 when filters change
-    useEffect(() => {
+    const [prevSearchTerm, setPrevSearchTerm] = useState(searchTerm);
+    const [prevStatusFilter, setPrevStatusFilter] = useState(statusFilter);
+    const [prevPageSize, setPrevPageSize] = useState(pageSize);
+
+    if (searchTerm !== prevSearchTerm || statusFilter !== prevStatusFilter || pageSize !== prevPageSize) {
+        setPrevSearchTerm(searchTerm);
+        setPrevStatusFilter(statusFilter);
+        setPrevPageSize(pageSize);
         setCurrentPage(1);
-    }, [searchTerm, statusFilter, pageSize]);
+    }
 
     // Calculate unique product-size replenish items
     const plannerItems = useMemo(() => {

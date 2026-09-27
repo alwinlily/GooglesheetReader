@@ -1,12 +1,13 @@
 import React from 'react';
-import { RefreshCcw } from 'lucide-react';
+import { RefreshCcw, Download } from 'lucide-react';
 
 interface HeaderProps {
     onRefresh: () => void;
     loading: boolean;
+    onExportPDF?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onRefresh, loading }) => {
+const Header: React.FC<HeaderProps> = ({ onRefresh, loading, onExportPDF }) => {
     return (
         <header className="dashboard-header">
             <div>
@@ -22,6 +23,15 @@ const Header: React.FC<HeaderProps> = ({ onRefresh, loading }) => {
                     <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                     Refresh
                 </button>
+                {onExportPDF && (
+                    <button
+                        className="btn-header-export text-xs md:text-sm"
+                        onClick={onExportPDF}
+                    >
+                        <Download className="w-4 h-4" />
+                        Export PDF
+                    </button>
+                )}
             </div>
         </header>
     );

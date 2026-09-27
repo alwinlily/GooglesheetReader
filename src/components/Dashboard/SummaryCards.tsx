@@ -1,14 +1,21 @@
 import React from 'react';
-import { Package, ArrowUpRight, ShoppingCart, Activity } from 'lucide-react';
+import { Package, ArrowUpRight, ShoppingCart, Activity, TrendingUp } from 'lucide-react';
 
 interface SummaryCardsProps {
     totalStock: number;
     totalIn: number;
     totalOut: number;
     totalReturn?: number;
+    dailySales: number;
 }
 
-const SummaryCards: React.FC<SummaryCardsProps> = ({ totalStock, totalIn, totalOut, totalReturn = 0 }) => {
+const SummaryCards: React.FC<SummaryCardsProps> = ({ 
+    totalStock, 
+    totalIn, 
+    totalOut, 
+    totalReturn = 0,
+    dailySales
+}) => {
     return (
         <div className="filter-grid mb-8">
             {/* Total Stock */}
@@ -30,6 +37,19 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({ totalStock, totalIn, totalO
                 <div>
                     <p className="kpi-label">Total In</p>
                     <p className="kpi-value font-numeric">+{totalIn.toLocaleString()}</p>
+                </div>
+            </div>
+
+            {/* Daily Sales */}
+            <div className="kpi-card kpi-card-daily">
+                <div className="p-3 rounded-xl bg-[#06b6d4]/10">
+                    <TrendingUp className="w-6 h-6 text-[#06b6d4]" />
+                </div>
+                <div>
+                    <p className="kpi-label">Daily Sales</p>
+                    <p className="kpi-value font-numeric">
+                        {dailySales.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                    </p>
                 </div>
             </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useInventoryData } from './hooks/useInventoryData';
+import { useOrderData } from './hooks/useOrderData';
 import Header from './components/Dashboard/Header';
 import Filters from './components/Dashboard/Filters';
 import SummaryCards from './components/Dashboard/SummaryCards';
@@ -8,13 +9,26 @@ import TopSalesTable from './components/Dashboard/TopSalesTable';
 import UnifiedForecastChart from './components/Charts/UnifiedForecastChart';
 import StockBreakdownChart from './components/Charts/StockBreakdownChart';
 import ReplenishmentPlanner from './components/Dashboard/ReplenishmentPlanner';
+import { OrderTracker } from './components/Dashboard/OrderTracker';
 import type { Size } from './types/inventory';
+import { getOneMonthAgoDate } from './utils/dateUtils';
 import { AlertOctagon } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import './styles/index.css';
 
 function App() {
+  const [activePage, setActivePage] = useState<'inventory' | 'orders'>('inventory');
   const [activeBrand, setActiveBrand] = useState<'Kaos Dika' | 'Marapthon'>('Kaos Dika');
   const { data, productMetadata, loading, error, products, dateRange, refresh } = useInventoryData(activeBrand);
+  const { 
+    orders: orderData, 
+    uniqueKonveksi, 
+    loading: ordersLoading, 
+    error: ordersError, 
+    refresh: refreshOrders 
+  } = useOrderData(activeBrand);
+  
   const dashboardRef = useRef<HTMLDivElement>(null);
 
   const [selectedProduct, setSelectedProduct] = useState('All');
@@ -71,8 +85,46 @@ function App() {
 
     const totalStock = Object.values(latestStocks).reduce((sum, val) => sum + val, 0);
 
-    return { totalIn, totalReturn, totalOut, totalStock };
-  }, [filteredData]);
+    // Calculate total calendar days in the selected range
+    let totalDays = 1;
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+
+    if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    } else {
+      const dates = data.map(r => r.date).sort();
+      if (dates.length > 0) {
+        const minD = new Date(dates[0]);
+        const maxD = new Date(dates[dates.length - 1]);
+        const diffTime = Math.abs(maxD.getTime() - minD.getTime());
+        totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      }
+    }
+    if (totalDays <= 0) totalDays = 1;
+
+    const dailySales = totalOut / totalDays;
+
+    return { totalIn, totalReturn, totalOut, totalStock, dailySales };
+  }, [filteredData, data, startDate, endDate]);
+
+  // Pre-aggregated sales by date and size across full dataset for Day-to-Day comparison
+  const historicalSalesMap = useMemo(() => {
+    const map: Record<string, { total: number; sizes: Record<string, number> }> = {};
+
+    data.forEach(r => {
+      if (selectedProduct !== 'All' && r.product !== selectedProduct) return;
+
+      if (!map[r.date]) {
+        map[r.date] = { total: 0, sizes: { 'S': 0, 'M': 0, 'L': 0, 'XL': 0, 'XXL': 0 } };
+      }
+      map[r.date].sizes[r.size] = (map[r.date].sizes[r.size] || 0) + r.out;
+      map[r.date].total += r.out;
+    });
+
+    return map;
+  }, [data, selectedProduct]);
 
   const trendData = useMemo(() => {
     // Group by date
@@ -102,15 +154,70 @@ function App() {
       }
     });
 
-    // Remove "total" if a specific size is selected to avoid redundancy
-    if (selectedSize !== 'All') {
+    // Populate 1-month-ago day-to-day comparison fields
+    const SIZES: Size[] = ['S', 'M', 'L', 'XL', 'XXL'];
+    Object.values(dateGroups).forEach((g: any) => {
+      const prevDateStr = getOneMonthAgoDate(g.date);
+      g.prevDate = prevDateStr;
+
+      const prevData = historicalSalesMap[prevDateStr];
+      if (selectedSize === 'All') {
+        g.prevTotal = prevData ? prevData.total : 0;
+        SIZES.forEach(s => {
+          g[`prev_${s}`] = prevData ? (prevData.sizes[s] || 0) : 0;
+        });
+      } else {
+        const sizeVal = prevData ? (prevData.sizes[selectedSize] || 0) : 0;
+        g.prevTotal = sizeVal;
+        g[`prev_${selectedSize}`] = sizeVal;
+      }
+    });
+
+    // Remove "total" if a specific size is selected and metric is Stock to avoid redundancy
+    if (selectedMetric === 'Stock' && selectedSize !== 'All') {
       Object.values(dateGroups).forEach((g: any) => {
         delete g.total;
       });
     }
 
     return Object.values(dateGroups).sort((a: any, b: any) => a.date.localeCompare(b.date));
-  }, [filteredData, selectedProduct, selectedSize, selectedMetric]);
+  }, [filteredData, selectedProduct, selectedSize, selectedMetric, historicalSalesMap]);
+
+
+
+  const handleExportPDF = async () => {
+    if (!dashboardRef.current) return;
+
+    // Select all components to hide during print/export
+    const exportButtons = document.querySelectorAll('.btn-header-refresh, .btn-header-export, .segmented-control, select, input');
+    exportButtons.forEach(btn => (btn as HTMLElement).style.display = 'none');
+
+    try {
+      const canvas = await html2canvas(dashboardRef.current, {
+        backgroundColor: '#0f172a',
+        scale: 2,
+        useCORS: true
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const imgWidth = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.save(`Inventory-Dashboard-${activeBrand}-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (e) {
+      console.error('PDF export failed:', e);
+    } finally {
+      exportButtons.forEach(btn => (btn as HTMLElement).style.display = '');
+    }
+  };
+
 
 
   const validationMismatches = useMemo(() => {
@@ -384,7 +491,7 @@ function App() {
     return dataPoints;
   }, [filteredData, selectedProduct, selectedSize, productMetadata, dateRange]);
 
-  if (error) {
+  if (activePage === 'inventory' && error) {
     return (
       <div className="dashboard-container flex items-center justify-center" style={{ height: '100vh' }}>
         <div className="card text-center">
@@ -398,103 +505,146 @@ function App() {
 
   return (
     <div className="dashboard-container" ref={dashboardRef}>
-      <Header onRefresh={refresh} loading={loading} />
+      <Header 
+        onRefresh={() => { refresh(); refreshOrders(); }} 
+        loading={loading || ordersLoading} 
+        onExportPDF={handleExportPDF} 
+      />
 
-      <div className="flex justify-between items-center mb-6 bg-[#1e293b] p-4 rounded-xl border border-[#334155]">
-        <div className="flex flex-col gap-1">
-          <span className="text-[0.7rem] uppercase tracking-wider text-[#94a3b8] font-bold">Active Brand</span>
-          <div className="segmented-control">
-            <button
-              className={`segmented-button ${activeBrand === 'Kaos Dika' ? 'active' : ''}`}
-              onClick={() => handleBrandChange('Kaos Dika')}
-            >
-              Kaos Dika
-            </button>
-            <button
-              className={`segmented-button ${activeBrand === 'Marapthon' ? 'active' : ''}`}
-              onClick={() => handleBrandChange('Marapthon')}
-            >
-              Marapthon
-            </button>
+      <div className="flex flex-col md:flex-row justify-start items-start md:items-center gap-6 mb-6 bg-[#1e293b] p-4 rounded-xl border border-[#334155]">
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="flex flex-col gap-1">
+            <span className="text-[0.7rem] uppercase tracking-wider text-[#94a3b8] font-bold">Halaman Menu</span>
+            <div className="segmented-control">
+              <button
+                className={`segmented-button ${activePage === 'inventory' ? 'active' : ''}`}
+                onClick={() => setActivePage('inventory')}
+              >
+                Stock Dashboard
+              </button>
+              <button
+                className={`segmented-button ${activePage === 'orders' ? 'active' : ''}`}
+                onClick={() => setActivePage('orders')}
+              >
+                Order Tracker
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-[0.7rem] uppercase tracking-wider text-[#94a3b8] font-bold">Active Brand</span>
+            <div className="segmented-control">
+              <button
+                className={`segmented-button ${activeBrand === 'Kaos Dika' ? 'active' : ''}`}
+                onClick={() => handleBrandChange('Kaos Dika')}
+              >
+                Kaos Dika
+              </button>
+              <button
+                className={`segmented-button ${activeBrand === 'Marapthon' ? 'active' : ''}`}
+                onClick={() => handleBrandChange('Marapthon')}
+              >
+                Marapthon
+              </button>
+            </div>
           </div>
         </div>
-        <div className="text-right hidden sm:block">
-          <span className="text-xs text-[#64748b]">Showing analysis for brand:</span>
-          <strong className="text-sm text-[#f1f5f9] block">{activeBrand}</strong>
+
+        <div className="text-left hidden sm:block md:border-l md:border-[#334155]/60 md:pl-6 py-1">
+          <span className="text-xs text-[#64748b]">Showing:</span>
+          <strong className="text-sm text-[#f1f5f9] block">
+            {activePage === 'inventory' ? 'Stock Dashboard' : 'Order Tracker'} ({activeBrand})
+          </strong>
         </div>
       </div>
 
-      {validationMismatches.length > 0 && (
-        <div className="flex flex-col gap-4 mb-8">
-          <div className="flex items-start justify-between gap-3 p-4 bg-[#ef4444]/10 border-l-4 border-[#ef4444] rounded-lg text-[#fca5a5] shadow-[0_4px_12px_rgba(239,68,68,0.05)]">
-            <div className="flex items-start gap-3">
-              <AlertOctagon className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <div>
-                <strong className="font-extrabold uppercase tracking-wide text-xs block mb-1">Validation Issue</strong>
-                <p className="text-sm text-[#fca5a5]/90">{validationMismatches.length} stock mismatch(es) detected. Expected stock (from yesterday's movement) does not match reported stock.</p>
+      {activePage === 'inventory' ? (
+        <>
+          {validationMismatches.length > 0 && (
+            <div className="flex flex-col gap-4 mb-8">
+              <div className="flex items-start justify-between gap-3 p-4 bg-[#ef4444]/10 border-l-4 border-[#ef4444] rounded-lg text-[#fca5a5] shadow-[0_4px_12px_rgba(239,68,68,0.05)]">
+                <div className="flex items-start gap-3">
+                  <AlertOctagon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-extrabold uppercase tracking-wide text-xs block mb-1">Validation Issue</strong>
+                    <p className="text-sm text-[#fca5a5]/90">{validationMismatches.length} stock mismatch(es) detected. Expected stock (from yesterday's movement) does not match reported stock.</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowValidationModal(true)}
+                  className="px-3 py-1.5 bg-[#ef4444]/20 hover:bg-[#ef4444]/35 border border-[#ef4444]/40 hover:border-[#ef4444]/60 text-[#fca5a5] font-bold text-xs rounded-lg transition-all whitespace-nowrap self-center"
+                >
+                  Lihat Detail
+                </button>
               </div>
             </div>
-            <button 
-              onClick={() => setShowValidationModal(true)}
-              className="px-3 py-1.5 bg-[#ef4444]/20 hover:bg-[#ef4444]/35 border border-[#ef4444]/40 hover:border-[#ef4444]/60 text-[#fca5a5] font-bold text-xs rounded-lg transition-all whitespace-nowrap self-center"
-            >
-              Lihat Detail
-            </button>
+          )}
+
+          <Filters
+            products={products}
+            selectedProduct={selectedProduct}
+            onProductChange={setSelectedProduct}
+            selectedSize={selectedSize}
+            onSizeChange={setSelectedSize}
+            dateRange={dateRange}
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+          />
+
+          <SummaryCards
+            totalStock={stats.totalStock}
+            totalIn={stats.totalIn}
+            dailySales={stats.dailySales}
+            totalOut={stats.totalOut}
+            totalReturn={stats.totalReturn}
+          />
+
+          <div className="flex flex-col gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <TopSalesTable data={topSalesData} />
+              <StockBreakdownChart data={stockBreakdown} />
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+              <StockTrendChart
+                data={trendData}
+                sizes={selectedSize === 'All' ? ['S', 'M', 'L', 'XL', 'XXL'] : [selectedSize]}
+                metric={selectedMetric}
+                onMetricChange={setSelectedMetric}
+                minStock={currentMinStock}
+                totalAggregate={selectedMetric === 'Stock' ? stats.totalStock : stats.totalOut}
+                selectedProduct={selectedProduct}
+                selectedSize={selectedSize}
+              />
+            </div>
+
+
+
+            <ReplenishmentPlanner
+              data={data}
+              productMetadata={productMetadata}
+              startDate={startDate}
+              endDate={endDate}
+            />
+
+            {selectedProduct !== 'All' && (
+              <UnifiedForecastChart data={unifiedForecastData} productName={selectedProduct} />
+            )}
           </div>
-        </div>
+        </>
+      ) : (
+        <OrderTracker
+          orders={orderData}
+          loading={ordersLoading}
+          error={ordersError}
+          uniqueKonveksi={uniqueKonveksi}
+        />
       )}
 
-      <Filters
-        products={products}
-        selectedProduct={selectedProduct}
-        onProductChange={setSelectedProduct}
-        selectedSize={selectedSize}
-        onSizeChange={setSelectedSize}
-        dateRange={dateRange}
-        startDate={startDate}
-        endDate={endDate}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-      />
-
-      <SummaryCards
-        totalStock={stats.totalStock}
-        totalIn={stats.totalIn}
-        totalOut={stats.totalOut}
-        totalReturn={stats.totalReturn}
-      />
-
-      <div className="flex flex-col gap-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <TopSalesTable data={topSalesData} />
-          <StockBreakdownChart data={stockBreakdown} />
-        </div>
-
-        <div className="grid grid-cols-1 gap-6">
-          <StockTrendChart
-            data={trendData}
-            sizes={selectedSize === 'All' ? ['S', 'M', 'L', 'XL', 'XXL'] : [selectedSize]}
-            metric={selectedMetric}
-            onMetricChange={setSelectedMetric}
-            minStock={currentMinStock}
-            totalAggregate={selectedMetric === 'Stock' ? stats.totalStock : stats.totalOut}
-          />
-        </div>
-
-        <ReplenishmentPlanner
-          data={data}
-          productMetadata={productMetadata}
-          startDate={startDate}
-          endDate={endDate}
-        />
-
-        {selectedProduct !== 'All' && (
-          <UnifiedForecastChart data={unifiedForecastData} productName={selectedProduct} />
-        )}
-      </div>
-
       <footer className="mt-8 text-center text-secondary text-sm pb-8">
-        <p>Report generated on {new Date().toLocaleString()}</p>
+        <p>Data per {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}, {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }).replace(/\./g, ':')}</p>
       </footer>
 
 
