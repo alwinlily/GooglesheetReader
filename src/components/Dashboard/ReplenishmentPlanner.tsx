@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import type { ReactNode } from 'react';
 import { Search, TriangleAlert, CirclePause, Calendar, CircleArrowDown, Info, TrendingDown } from 'lucide-react';
 import type { InventoryRecord, Size } from '../../types/inventory';
 import type { ProductMetadata } from '../../hooks/useInventoryData';
@@ -8,6 +9,7 @@ interface ReplenishmentPlannerProps {
     productMetadata: Record<string, Record<string, ProductMetadata>>;
     startDate?: string;
     endDate?: string;
+    children?: ReactNode;
 }
 
 type ReplenishmentStatus = 'Out of Stock' | 'Order Soon' | 'Hold Order' | 'Stable';
@@ -28,7 +30,7 @@ interface PlannerItem {
     suggestedOrderQty: number;
 }
 
-const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, productMetadata, startDate, endDate }) => {
+const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, startDate, endDate, children }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'All' | ReplenishmentStatus>('All');
     const [sortBy, setSortBy] = useState<'product' | 'size' | 'currentStock' | 'velocity' | 'restockInterval' | 'minStock' | 'daysToStockOut' | 'status'>('daysToStockOut');
@@ -209,7 +211,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
         });
 
         return items;
-    }, [data, productMetadata, startDate, endDate]);
+    }, [data, startDate, endDate]);
 
     // Summary counts
     const summary = useMemo(() => {
@@ -247,12 +249,14 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
         return plannerItems
             .filter(item => {
                 const matchesSearch = item.product.toLowerCase().includes(searchTerm.toLowerCase());
-                const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
+                const matchesStatus = statusFilter === 'All'
+                    || item.status === statusFilter
+                    || (statusFilter === 'Hold Order' && item.status === 'Stable');
                 return matchesSearch && matchesStatus;
             })
             .sort((a, b) => {
-                let valA: any = a[sortBy];
-                let valB: any = b[sortBy];
+                let valA: string | number = a[sortBy];
+                let valB: string | number = b[sortBy];
 
                 if (sortBy === 'currentStock') {
                     valA = a.currentStock;
@@ -262,12 +266,14 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
                     valB = b.daysToStockOut === Infinity ? 999999 : b.daysToStockOut;
                 }
 
-                if (typeof valA === 'string') {
+                if (typeof valA === 'string' && typeof valB === 'string') {
                     return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
                 }
 
-                if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-                if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+                if (typeof valA === 'number' && typeof valB === 'number') {
+                    if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+                    if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+                }
                 return 0;
             });
     }, [plannerItems, searchTerm, statusFilter, sortBy, sortOrder]);
@@ -279,6 +285,8 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
     }, [filteredItems, currentPage, pageSize]);
 
     const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+
+    if (currentPage > totalPages) setCurrentPage(totalPages);
 
     const getStatusBadge = (status: ReplenishmentStatus) => {
         switch (status) {
@@ -298,14 +306,14 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
                 );
             case 'Hold Order':
                 return (
-                    <span className="status-badge status-badge-hold" data-tooltip="Stok saat ini masih aman di atas batas safety stock. Belum perlu memesan.">
+                    <span className="status-badge !bg-[#22c55e]/10 !border-[#22c55e]/30 !text-[#86efac]" data-tooltip="Stok saat ini masih aman di atas batas safety stock. Belum perlu memesan.">
                         <Info className="w-3.5 h-3.5 flex-shrink-0" />
                         Tunda Order
                     </span>
                 );
             case 'Stable':
                 return (
-                    <span className="status-badge status-badge-stable" data-tooltip="Stok stabil dan laju penjualan 0. Tidak diperlukan pemesanan baru.">
+                    <span className="status-badge !bg-[#22c55e]/10 !border-[#22c55e]/30 !text-[#86efac]" data-tooltip="Stok stabil dan laju penjualan 0. Tidak diperlukan pemesanan baru.">
                         <CirclePause className="w-3.5 h-3.5 flex-shrink-0" />
                         Stabil
                     </span>
@@ -314,107 +322,81 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
     };
 
     return (
-        <div className="glass-card w-full shadow-soft relative overflow-hidden border border-[#334155]/80">
-            {/* Visual glow blobs in background */}
-            <div className="absolute top-0 right-0 w-80 h-80 bg-[#3b82f6]/5 rounded-full blur-3xl -z-10 pointer-events-none" style={{ top: 0, right: 0 }}></div>
-            <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#8b5cf6]/5 rounded-full blur-3xl -z-10 pointer-events-none" style={{ bottom: 0, left: 0 }}></div>
+        <section className="planner-section w-full">
+            <div className="flex flex-wrap gap-2 mb-6" aria-label="Filter status pemesanan">
+                <button type="button"
+                    onClick={() => setStatusFilter('Order Soon')}
+                    aria-pressed={statusFilter === 'Order Soon'}
+                    className={`min-h-10 px-3 py-2 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 ${
+                        statusFilter === 'Order Soon' 
+                        ? 'bg-[#f59e0b]/10 border-[#f59e0b]'
+                        : 'bg-[#1e293b] border-[#334155] hover:border-[#f59e0b]/50'
+                    }`}
+                >
+                    <TriangleAlert className="w-4 h-4 text-[#f59e0b]" />
+                    <span className="text-xs text-[#cbd5e1] font-bold">Order Segera</span>
+                    <span className="text-sm text-[#fbbf24] font-extrabold font-numeric">{summary.orderSoon}</span>
+                </button>
 
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-[#334155]/40 pb-5">
+                <button type="button"
+                    onClick={() => setStatusFilter('Out of Stock')}
+                    aria-pressed={statusFilter === 'Out of Stock'}
+                    className={`min-h-10 px-3 py-2 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 ${
+                        statusFilter === 'Out of Stock'
+                        ? 'bg-[#ef4444]/10 border-[#ef4444]'
+                        : 'bg-[#1e293b] border-[#334155] hover:border-[#ef4444]/50'
+                    }`}
+                >
+                    <CircleArrowDown className="w-4 h-4 text-[#ef4444]" />
+                    <span className="text-xs text-[#cbd5e1] font-bold">Stok Habis</span>
+                    <span className="text-sm text-[#f87171] font-extrabold font-numeric">{summary.outOfStock}</span>
+                </button>
+
+                <button type="button"
+                    onClick={() => setStatusFilter('Hold Order')}
+                    aria-pressed={statusFilter === 'Hold Order'}
+                    className={`min-h-10 px-3 py-2 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 ${
+                        statusFilter === 'Hold Order'
+                        ? 'bg-[#22c55e]/10 border-[#22c55e]'
+                        : 'bg-[#1e293b] border-[#334155] hover:border-[#22c55e]/50'
+                    }`}
+                >
+                    <CirclePause className="w-4 h-4 text-[#22c55e]" />
+                    <span className="text-xs text-[#cbd5e1] font-bold">Tunda</span>
+                    <span className="text-sm text-[#4ade80] font-extrabold font-numeric">{summary.holdOrder + summary.stable}</span>
+                </button>
+
+                <button type="button"
+                    onClick={() => setStatusFilter('All')}
+                    aria-pressed={statusFilter === 'All'}
+                    className={`min-h-10 px-3 py-2 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 ${
+                        statusFilter === 'All' 
+                        ? 'bg-white/10 border-[#94a3b8]'
+                        : 'bg-[#1e293b] border-[#334155] hover:border-[#94a3b8]/50'
+                    }`}
+                >
+                    <TrendingDown className="w-4 h-4 text-[#94a3b8]" />
+                    <span className="text-xs text-[#cbd5e1] font-bold">Semua</span>
+                    <span className="text-sm text-white font-extrabold font-numeric">{summary.total}</span>
+                </button>
+            </div>
+
+            {children && <div className="mb-8">{children}</div>}
+
+            <div className="glass-card w-full shadow-soft border border-[#334155]/80">
+
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-[#334155]/40 pb-5">
                 <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#8b5cf6]/10 to-[#3b82f6]/10 border border-[#3b82f6]/20">
-                        <Calendar className="w-5 h-5 text-[#3b82f6]" />
+                    <div className="p-2 rounded-lg bg-white/5 border border-[#334155]">
+                        <Calendar className="w-5 h-5 text-[#94a3b8]" />
                     </div>
                     <div>
                         <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em] mb-0.5">
-                            Perencanaan Pemesanan Ulang & Kecepatan Produk
+                            Rencana Pemesanan
                         </h3>
-                        <p className="text-xs text-[#94a3b8] italic">
-                            Kalkulasi stok minimum aman secara riil berdasarkan laju penambahan stok (siklus restok) dan kecepatan penjualan riil.
+                        <p className="text-xs text-[#94a3b8]">
+                            Stok minimum dihitung dari laju penjualan dan siklus restok aktual.
                         </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Quick Metrics Summary Tabs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div 
-                    onClick={() => setStatusFilter('Order Soon')}
-                    className={`p-4 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between ${
-                        statusFilter === 'Order Soon' 
-                        ? 'bg-[#f59e0b]/10 border-[#f59e0b] shadow-[0_4px_20px_rgba(245,158,11,0.15)] transform -translate-y-0.5' 
-                        : 'bg-[#1e293b] border-[#334155] hover:border-[#f59e0b]/30 hover:bg-[#2d3f55]'
-                    }`}
-                >
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] text-[#94a3b8] font-bold uppercase tracking-wider">Order Segera</span>
-                        <div className="p-1 rounded-md bg-[#f59e0b]/10">
-                            <TriangleAlert className="w-3.5 h-3.5 text-[#f59e0b]" />
-                        </div>
-                    </div>
-                    <div>
-                        <div className="text-[1.8rem] font-extrabold text-[#f59e0b] font-numeric leading-none">{summary.orderSoon}</div>
-                        <div className="text-[10px] text-[#94a3b8]/60 mt-1.5">&lt; 60 Hari Habis</div>
-                    </div>
-                </div>
-
-                <div 
-                    onClick={() => setStatusFilter('Hold Order')}
-                    className={`p-4 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between ${
-                        statusFilter === 'Hold Order' 
-                        ? 'bg-[#3b82f6]/10 border-[#3b82f6] shadow-[0_4px_20px_rgba(59,130,246,0.15)] transform -translate-y-0.5' 
-                        : 'bg-[#1e293b] border-[#334155] hover:border-[#3b82f6]/30 hover:bg-[#2d3f55]'
-                    }`}
-                >
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] text-[#94a3b8] font-bold uppercase tracking-wider">Tunda Order</span>
-                        <div className="p-1 rounded-md bg-[#3b82f6]/10">
-                            <Info className="w-3.5 h-3.5 text-[#3b82f6]" />
-                        </div>
-                    </div>
-                    <div>
-                        <div className="text-[1.8rem] font-extrabold text-[#3b82f6] font-numeric leading-none">{summary.holdOrder}</div>
-                        <div className="text-[10px] text-[#94a3b8]/60 mt-1.5">&gt; 60 Hari Habis</div>
-                    </div>
-                </div>
-
-                <div 
-                    onClick={() => setStatusFilter('Out of Stock')}
-                    className={`p-4 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between ${
-                        statusFilter === 'Out of Stock' 
-                        ? 'bg-[#ef4444]/10 border-[#ef4444] shadow-[0_4px_20px_rgba(239,68,68,0.15)] transform -translate-y-0.5' 
-                        : 'bg-[#1e293b] border-[#334155] hover:border-[#ef4444]/30 hover:bg-[#2d3f55]'
-                    }`}
-                >
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] text-[#94a3b8] font-bold uppercase tracking-wider">Stok Habis</span>
-                        <div className="p-1 rounded-md bg-[#ef4444]/10">
-                            <CircleArrowDown className="w-3.5 h-3.5 text-[#ef4444]" />
-                        </div>
-                    </div>
-                    <div>
-                        <div className="text-[1.8rem] font-extrabold text-[#ef4444] font-numeric leading-none">{summary.outOfStock}</div>
-                        <div className="text-[10px] text-[#94a3b8]/60 mt-1.5">Kosong (0 unit)</div>
-                    </div>
-                </div>
-
-                <div 
-                    onClick={() => setStatusFilter('All')}
-                    className={`p-4 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between ${
-                        statusFilter === 'All' 
-                        ? 'bg-gradient-to-br from-[#1e293b] to-[#2d3f55]/40 border-[#f1f5f9]/30 shadow-soft transform -translate-y-0.5' 
-                        : 'bg-[#1e293b] border-[#334155] hover:border-[#f1f5f9]/20 hover:bg-[#2d3f55]'
-                    }`}
-                >
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] text-[#94a3b8] font-bold uppercase tracking-wider">Total Item</span>
-                        <div className="p-1 rounded-md bg-white/5">
-                            <TrendingDown className="w-3.5 h-3.5 text-[#3b82f6]" />
-                        </div>
-                    </div>
-                    <div>
-                        <div className="text-[1.8rem] font-extrabold text-white font-numeric leading-none">{summary.total}</div>
-                        <div className="text-[10px] text-[#94a3b8]/60 mt-1.5">Semua Kombinasi</div>
                     </div>
                 </div>
             </div>
@@ -472,94 +454,88 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
             </div>
 
             {/* Main Table */}
-            <div className="overflow-x-auto border border-[#334155]/60 rounded-2xl bg-[#1e293b]/25">
-                <table className="w-full text-xs planner-table min-w-[900px]">
-                    <thead>
+            <div className="max-h-[65vh] overflow-auto border border-[#334155]/60 rounded-2xl bg-[#1e293b]/25">
+                <table className="w-full text-xs planner-table min-w-[1080px]">
+                    <thead className="sticky top-0 z-10">
                         <tr className="bg-[#0f172a] text-[#64748b] text-xs uppercase tracking-wider border-b border-[#334155]">
-                            <th className="py-4 px-5 text-left font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-product" onClick={() => handleSort('product')}>
+                            <th className="py-4 px-5 text-left font-bold tracking-wider cursor-pointer hover:text-white uppercase text-xs col-product" onClick={() => handleSort('product')}>
                                 Produk {sortBy === 'product' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                             </th>
-                            <th className="py-4 px-3 text-center font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-size" onClick={() => handleSort('size')}>
+                            <th className="py-4 px-3 text-center font-bold tracking-wider cursor-pointer hover:text-white uppercase text-xs col-size" onClick={() => handleSort('size')}>
                                 Ukuran {sortBy === 'size' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                             </th>
-                            <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-stock" onClick={() => handleSort('currentStock')}>
+                            <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-xs col-stock" onClick={() => handleSort('currentStock')}>
                                 Stok {sortBy === 'currentStock' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                             </th>
                             {showExtraCols && (
                                 <>
-                                    <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-velocity" onClick={() => handleSort('velocity')}>
+                                    <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-xs col-velocity" onClick={() => handleSort('velocity')}>
                                         Laju Jual {sortBy === 'velocity' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                                     </th>
-                                    <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-cycle" onClick={() => handleSort('restockInterval')}>
+                                    <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-xs col-cycle" onClick={() => handleSort('restockInterval')}>
                                         Siklus {sortBy === 'restockInterval' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                                     </th>
                                 </>
                             )}
-                            <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-min-stock" onClick={() => handleSort('minStock')}>
+                            <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-xs col-min-stock" onClick={() => handleSort('minStock')}>
                                 Stok Min Aman {sortBy === 'minStock' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                             </th>
-                            <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-stockout" onClick={() => handleSort('daysToStockOut')}>
+                            <th className="py-4 px-4 text-right font-bold tracking-wider cursor-pointer hover:text-white uppercase text-xs col-stockout" onClick={() => handleSort('daysToStockOut')}>
                                 Estimasi Habis {sortBy === 'daysToStockOut' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                             </th>
-                            <th className="py-4 px-4 text-center font-bold tracking-wider cursor-pointer hover:text-white uppercase text-[11px] col-status" onClick={() => handleSort('status')}>
+                            <th className="py-4 px-4 text-center font-bold tracking-wider cursor-pointer hover:text-white uppercase text-xs col-status" onClick={() => handleSort('status')}>
                                 Status Indikator {sortBy === 'status' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                             </th>
-                            <th className="py-4 px-5 text-left font-bold uppercase text-[11px] col-recommendation">Rekomendasi Rencana Pemesanan (Aksi & Estimasi Tanggal)</th>
+                            <th className="py-4 px-4 text-right font-bold uppercase text-xs">Order</th>
+                            <th className="py-4 px-4 text-left font-bold uppercase text-xs">Batas Order</th>
+
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-[#334155]/40">
-                        {paginatedItems.map(item => {
-                            const showProgress = item.daysToStockOut !== Infinity && item.daysToStockOut > 0;
-                            const progressWidth = showProgress ? Math.min(100, (item.daysToStockOut / 120) * 100) : 0;
-                            
-                            // Dynamic color classes based on stock level status
-                            let barColorClass = 'bg-gradient-to-r from-[#10b981] to-[#059669] shadow-[0_0_8px_rgba(16,185,129,0.4)]';
-                            if (item.status === 'Order Soon') {
-                                barColorClass = 'bg-gradient-to-r from-[#f59e0b] to-orange-500 shadow-[0_0_8px_rgba(245,178,60,0.4)]';
-                            } else if (item.status === 'Out of Stock') {
-                                barColorClass = 'bg-[#ef4444]';
-                            }
- 
-                            return (
-                                <tr key={`${item.product}-${item.size}`}>
+                        {paginatedItems.map(item => (
+                                <tr key={`${item.product}-${item.size}`} className="odd:bg-white/[0.025] even:bg-transparent hover:bg-white/[0.05]">
                                     <td className="py-4.5 px-5 font-bold text-white text-sm col-product">
                                         {item.product}
+
+                                        <details className="group max-w-sm text-xs font-normal mt-1 whitespace-normal">
+                                            <summary className="cursor-pointer text-[#cbd5e1] font-semibold hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#10b981] rounded">
+                                                Lihat detail
+                                            </summary>
+                                            <p className="mt-2 leading-relaxed text-[#94a3b8]">{item.suggestion}</p>
+                                        </details>
+
                                     </td>
                                     <td className="py-4.5 px-3 text-center col-size">
-                                        <span className="px-2.5 py-1 rounded bg-[#334155]/45 text-[#cbd5e1] text-[11px] font-black border border-[#334155]">
+                                        <span className="px-2.5 py-1 rounded bg-[#334155]/45 text-[#cbd5e1] text-xs font-black border border-[#334155]">
                                             {item.size}
                                         </span>
                                     </td>
                                     <td className="py-4.5 px-4 text-right font-extrabold text-white font-numeric text-sm col-stock">
-                                        {item.currentStock.toLocaleString()}
+                                        {item.currentStock.toLocaleString('id-ID')} pcs
                                     </td>
                                     {showExtraCols && (
                                         <>
                                             <td className="py-4.5 px-4 text-right text-[#94a3b8] font-numeric font-medium text-sm col-velocity">
-                                                {item.velocity.toFixed(2)}
-                                                <span className="text-[10px] text-[#94a3b8]/40 block font-normal tracking-wide">(Riil)</span>
+                                                {item.velocity.toLocaleString('id-ID', { maximumFractionDigits: 2 })} pcs/hari
                                             </td>
                                             <td className="py-4.5 px-4 text-right text-white font-numeric font-semibold text-xs col-cycle">
-                                                {item.restockInterval} Hari
+                                                {item.restockInterval.toLocaleString('id-ID')} hari
                                             </td>
                                         </>
                                     )}
-                                    <td className="py-4.5 px-4 text-right text-[#3b82f6] font-numeric font-extrabold text-sm col-min-stock">
-                                        {item.minStock.toLocaleString()}
+                                    <td className="py-4.5 px-4 text-right text-[#cbd5e1] font-numeric font-semibold text-sm col-min-stock">
+                                        {item.minStock.toLocaleString('id-ID')} pcs
                                     </td>
                                     <td className="py-4.5 px-4 text-right col-stockout">
                                         {item.currentStock <= 0 ? (
-                                            <span className="text-[#ff6b6b] font-bold text-xs">Habis</span>
+                                            <span className="text-[#cbd5e1] font-medium text-xs">Habis</span>
                                         ) : item.daysToStockOut === Infinity ? (
                                             <span className="text-[#94a3b8]/50 italic font-medium text-xs">Stabil</span>
                                         ) : (
                                             <div className="flex flex-col items-end">
-                                                <span className={`font-black font-numeric text-[0.875rem] ${item.status === 'Order Soon' ? 'text-[#fbbf24]' : 'text-[#4ade80]'}`}>
-                                                    {Math.round(item.daysToStockOut)} Hari
+                                                <span className="font-semibold font-numeric text-sm text-[#cbd5e1]">
+                                                    {Math.round(item.daysToStockOut).toLocaleString('id-ID')} hari
                                                 </span>
-                                                <div className="w-16 h-1.5 bg-[#0f172a] rounded-full overflow-hidden mt-1.5 border border-[#334155]/40">
-                                                    <div className={`h-full rounded-full ${barColorClass}`} style={{ width: `${progressWidth}%` }}></div>
-                                                </div>
                                             </div>
                                         )}
                                     </td>
@@ -568,36 +544,20 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
                                             {getStatusBadge(item.status)}
                                         </div>
                                     </td>
-                                    <td className="py-4.5 px-5 text-left col-recommendation">
-                                        <div 
-                                            title={item.suggestion}
-                                            className={`p-2.5 rounded-xl border leading-relaxed text-xs shadow-sm flex items-center gap-2 w-full ${
-                                                item.status === 'Out of Stock' ? 'bg-[#ef4444]/10 border-[#ef4444]/20 text-[#fca5a5]' :
-                                                item.status === 'Order Soon' ? 'bg-[#f59e0b]/10 border-[#f59e0b]/20 text-[#fde047]' :
-                                                item.status === 'Hold Order' ? 'bg-[#3b82f6]/10 border-[#3b82f6]/20 text-[#93c5fd]' :
-                                                'bg-white/5 border-[#334155] text-[#94a3b8]'
-                                            }`}
-                                        >
-                                            <div className="flex-shrink-0">
-                                                {item.status === 'Out of Stock' ? (
-                                                    <CircleArrowDown className="w-3.5 h-3.5 text-[#ff6b6b] flex-shrink-0" />
-                                                ) : item.status === 'Order Soon' ? (
-                                                    <TriangleAlert className="w-3.5 h-3.5 animate-bounce text-[#fbbf24] flex-shrink-0" />
-                                                ) : item.status === 'Hold Order' ? (
-                                                    <Info className="w-3.5 h-3.5 text-[#60a5fa] flex-shrink-0" />
-                                                ) : (
-                                                    <CirclePause className="w-3.5 h-3.5 text-[#64748b] flex-shrink-0" />
-                                                )}
-                                            </div>
-                                            <div className="text-ellipsis-clip flex-1">{item.suggestion}</div>
-                                        </div>
+                                    <td className="py-4.5 px-4 text-right text-[#cbd5e1] font-semibold whitespace-nowrap">
+                                        {item.suggestedOrderQty.toLocaleString('id-ID')} pcs
                                     </td>
+                                    <td className="py-4.5 px-4 text-left text-[#cbd5e1] whitespace-nowrap">
+                                        {item.status === 'Out of Stock' || (item.status === 'Order Soon' && item.daysToReorder === 0)
+                                            ? 'Hari ini'
+                                            : item.reorderDateStr ?? '—'}
+                                    </td>
+
                                 </tr>
-                            );
-                        })}
+                            ))}
                         {filteredItems.length === 0 && (
                             <tr>
-                                <td colSpan={showExtraCols ? 9 : 7} className="py-12 text-center text-[#94a3b8] italic text-xs">
+                                <td colSpan={showExtraCols ? 10 : 8} className="py-12 text-center text-[#94a3b8] italic text-xs">
                                     Tidak ada produk yang cocok dengan pencarian atau filter status.
                                 </td>
                             </tr>
@@ -669,17 +629,18 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, produ
 
             {/* Premium Info Legend Card */}
             <div className="mt-6 p-4 bg-white/[0.02] border border-[#334155]/60 rounded-2xl flex items-start gap-3 text-xs text-[#94a3b8] leading-relaxed">
-                <Info className="w-4 h-4 text-[#3b82f6] flex-shrink-0 mt-0.5" />
+                <Info className="w-4 h-4 text-[#94a3b8] flex-shrink-0 mt-0.5" />
                 <div>
-                    <span className="font-extrabold text-white block mb-1 uppercase tracking-wider text-[10px]">Panduan Kriteria Kecepatan Pemesanan Ulang:</span>
+                    <span className="font-extrabold text-white block mb-1 uppercase tracking-wider text-xs">Panduan Kriteria Kecepatan Pemesanan Ulang:</span>
                     <ul className="list-disc pl-4 space-y-1 text-[#94a3b8]/80">
-                        <li><strong>Stok Min Aman (Safety Stock)</strong>: Batas minimum stok sebelum Anda kehabisan barang. Nilai ini dihitung secara riil menggunakan rumus: **Laju Jual/Hari x Siklus Restok**.</li>
-                        <li><strong>Siklus Restok</strong>: Rata-rata jeda waktu dalam hari antara penambahan stok masuk ('in &gt; 0') di masa lalu. Jika data historis terbatas, sistem secara otomatis menetapkan default **30 Hari (1 Bulan)** sebagai asumsi siklus tunggu pengiriman Anda agar tetap aman.</li>
-                        <li><strong>Rekomendasi Jumlah Order</strong>: Dihitung secara cerdas menggunakan selisih antara proyeksi penjualan 60 hari ke depan dengan stok saat ini: **(Laju Jual/Hari x 60 Hari) - Stok Saat Ini**. Hal ini dirancang khusus agar Anda tidak melakukan *over-ordering* untuk produk yang penjualannya lambat (*slow-moving*).</li>
+                        <li><strong>Stok Min Aman (Safety Stock)</strong>: Batas minimum stok sebelum Anda kehabisan barang. Rumus: <strong>Laju Jual/Hari × Siklus Restok</strong>.</li>
+                        <li><strong>Siklus Restok</strong>: Rata-rata jeda hari antara stok masuk di masa lalu. Jika data historis terbatas, sistem memakai asumsi <strong>30 hari (1 bulan)</strong>.</li>
+                        <li><strong>Rekomendasi Jumlah Order</strong>: Selisih antara proyeksi penjualan 60 hari dan stok saat ini: <strong>(Laju Jual/Hari × 60 Hari) − Stok Saat Ini</strong>. Rumus ini membantu mengurangi pesanan berlebih untuk produk yang bergerak lambat.</li>
                     </ul>
                 </div>
             </div>
-        </div>
+            </div>
+        </section>
     );
 };
 

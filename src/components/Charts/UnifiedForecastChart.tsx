@@ -40,21 +40,21 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                         <div className="flex items-center gap-2 pr-4 border-r border-[#334155]">
                             <Target className="w-3.5 h-3.5 text-[#94a3b8]" />
                             <div>
-                                <div className="text-[10px] text-[#64748b] uppercase font-bold leading-tight">Target</div>
+                                <div className="text-xs text-[#94a3b8] uppercase font-bold leading-tight">Target</div>
                                 <div className="text-sm font-extrabold text-white leading-tight">{data[0]?.target || 0}</div>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 pr-4 border-r border-[#334155]">
                             <Box className="w-3.5 h-3.5 text-[#3b82f6]" />
                             <div>
-                                <div className="text-[10px] text-[#64748b] uppercase font-bold leading-tight">Stock</div>
+                                <div className="text-xs text-[#94a3b8] uppercase font-bold leading-tight">Stock</div>
                                 <div className="text-sm font-extrabold text-[#3b82f6] leading-tight">{data[0]?.stock || 0}</div>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 pr-4 border-r border-[#334155]">
                             <History className="w-3.5 h-3.5 text-[#94a3b8]" />
                             <div>
-                                <div className="text-[10px] text-[#64748b] uppercase font-bold leading-tight">End</div>
+                                <div className="text-xs text-[#94a3b8] uppercase font-bold leading-tight">End</div>
                                 <div className="text-sm font-extrabold text-white opacity-60 leading-tight">{data[data.length - 1]?.stock || 0}</div>
                             </div>
                         </div>
@@ -63,9 +63,9 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                             <div className="flex items-center gap-2">
                                 <CircleArrowDown className="w-3.5 h-3.5 text-[#ef4444]" />
                                 <div>
-                                    <div className="text-[10px] text-[#ef4444]/70 uppercase font-bold leading-tight">Stock Out</div>
+                                    <div className="text-xs text-[#ef4444]/70 uppercase font-bold leading-tight">Stock Out</div>
                                     <div className="text-sm font-extrabold text-[#ef4444] leading-tight">
-                                        {new Date(outOfStockPoint.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                        {new Date(outOfStockPoint.date).toLocaleDateString('id-ID', { month: 'short', day: 'numeric' })}
                                     </div>
                                 </div>
                             </div>
@@ -73,7 +73,7 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                             <div className="flex items-center gap-2">
                                 <CirclePause className="w-3.5 h-3.5 text-[#64748b] opacity-40" />
                                 <div>
-                                    <div className="text-[10px] text-[#64748b]/40 uppercase font-bold leading-tight">Stock Out</div>
+                                    <div className="text-xs text-[#64748b]/60 uppercase font-bold leading-tight">Stock Out</div>
                                     <div className="text-sm font-extrabold text-[#64748b]/40 leading-tight">Stable</div>
                                 </div>
                             </div>
@@ -94,26 +94,27 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                     <XAxis
                         dataKey="date"
                         stroke="#64748b"
-                        fontSize={11}
+                        fontSize={12}
+                        minTickGap={40}
                         tickFormatter={(str) => {
                             const date = new Date(str);
-                            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                            return date.toLocaleDateString('id-ID', { month: 'short', day: 'numeric' });
                         }}
                     />
                     {/* Left Y-Axis for Sales */}
                     <YAxis
                         yAxisId="left"
                         stroke="#64748b"
-                        fontSize={11}
-                        label={{ value: 'Sales Units', angle: -90, position: 'insideLeft', style: { fill: '#64748b', fontSize: '11px' } }}
+                        fontSize={12}
+                        label={{ value: 'Sales (pcs)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8', fontSize: '12px' } }}
                     />
                     {/* Right Y-Axis for Stock */}
                     <YAxis
                         yAxisId="right"
                         orientation="right"
                         stroke="#3b82f6"
-                        fontSize={11}
-                        label={{ value: 'Stock Level', angle: 90, position: 'insideRight', style: { fill: '#3b82f6', fontSize: '11px' } }}
+                        fontSize={12}
+                        label={{ value: 'Stok (pcs)', angle: 90, position: 'insideRight', style: { fill: '#3b82f6', fontSize: '12px' } }}
                     />
                     <Tooltip
                         contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f1f5f9' }}
@@ -122,7 +123,7 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                             const date = new Date(label);
                             const pastDate = new Date(date);
                             pastDate.setMonth(date.getMonth() - 1);
-                            return `Forecast Date: ${date.toLocaleDateString()} (vs ${pastDate.toLocaleDateString()})`;
+                            return `Tanggal Proyeksi: ${date.toLocaleDateString('id-ID')} (vs ${pastDate.toLocaleDateString('id-ID')})`;
                         }}
                     />
                     <Legend verticalAlign="top" height={36} />
@@ -142,7 +143,7 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                     {/* Reference line for Reorder (Right Axis) */}
                     {minStockValue > 0 && (
                         <ReferenceLine yAxisId="right" y={minStockValue} stroke="#ef4444" strokeDasharray="3 3">
-                            <Label value="REORDER" position="right" fill="#ef4444" fontSize={10} fontWeight="bold" />
+                            <Label value="REORDER" position="right" fill="#ef4444" fontSize={12} fontWeight="bold" />
                         </ReferenceLine>
                     )}
 
@@ -156,6 +157,7 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                         strokeWidth={2}
                         strokeDasharray="5 5"
                         dot={false}
+                        activeDot={{ r: 4 }}
                     />
 
                     {/* Past Actual Line (Left Axis) */}
@@ -166,8 +168,8 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                         dataKey="pastActual"
                         stroke="#8b5cf6"
                         strokeWidth={2}
-                        dot={{ r: 3, fill: "#8b5cf6" }}
-                        activeDot={{ r: 5 }}
+                        dot={false}
+                        activeDot={{ r: 4 }}
                         connectNulls
                     />
                 </ComposedChart>

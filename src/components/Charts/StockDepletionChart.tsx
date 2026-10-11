@@ -26,7 +26,7 @@ const StockDepletionChart: React.FC<StockDepletionChartProps> = ({ data, product
                 </h3>
                 {outOfStockDate && (
                     <div className="text-xs font-bold text-red-500 bg-red-500/10 px-2 py-1 rounded">
-                        Est. Stock Out: {new Date(outOfStockDate).toLocaleDateString()}
+                        Est. Stock Out: {new Date(outOfStockDate).toLocaleDateString('id-ID')}
                     </div>
                 )}
             </div>
@@ -43,17 +43,18 @@ const StockDepletionChart: React.FC<StockDepletionChartProps> = ({ data, product
                     <XAxis
                         dataKey="date"
                         stroke="#8b949e"
-                        fontSize={10}
+                        fontSize={12}
+                        minTickGap={40}
                         tickFormatter={(str) => {
                             const date = new Date(str);
-                            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                            return date.toLocaleDateString('id-ID', { month: 'short', day: 'numeric' });
                         }}
                     />
                     <YAxis stroke="#8b949e" fontSize={12} />
                     <Tooltip
                         contentStyle={{ backgroundColor: '#161b22', borderColor: '#30363d', color: '#f0f6fc' }}
                         itemStyle={{ fontSize: '12px' }}
-                        labelFormatter={(label) => new Date(label).toLocaleDateString(undefined, {
+                        labelFormatter={(label) => new Date(label).toLocaleDateString('id-ID', {
                             weekday: 'long',
                             year: 'numeric',
                             month: 'long',
@@ -62,7 +63,7 @@ const StockDepletionChart: React.FC<StockDepletionChartProps> = ({ data, product
                     />
                     {minStockValue > 0 && (
                         <ReferenceLine y={minStockValue} stroke="#da3633" strokeDasharray="3 3">
-                            <Label value="REORDER" position="left" fill="#da3633" fontSize={10} fontWeight="bold" />
+                            <Label value="REORDER" position="left" fill="#da3633" fontSize={12} fontWeight="bold" />
                         </ReferenceLine>
                     )}
                     <Area
@@ -75,7 +76,7 @@ const StockDepletionChart: React.FC<StockDepletionChartProps> = ({ data, product
                     />
                 </AreaChart>
             </ResponsiveContainer>
-            <div className="mt-4 text-[10px] text-secondary italic text-center">
+            <div className="mt-4 text-xs text-secondary italic text-center">
                 * Based on current daily sales targets from Master sheet.
             </div>
         </div>

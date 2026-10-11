@@ -1,83 +1,24 @@
-import React from 'react';
-import { Package, ArrowUpRight, ShoppingCart, Activity, TrendingUp } from 'lucide-react';
-
-interface SummaryCardsProps {
-    totalStock: number;
-    totalIn: number;
-    totalOut: number;
-    totalReturn?: number;
-    dailySales: number;
+import type { InventoryStats } from '../../utils/inventoryStats';
+interface SummaryCardsProps extends InventoryStats { previous?: InventoryStats | null; }
+export default function SummaryCards({ totalStock, totalIn, totalOut, totalReturn, dailySales, previous }: SummaryCardsProps) {
+    const cards = [
+        { key: 'totalStock', label: 'Total stok', value: totalStock, unit: 'pcs' },
+        { key: 'totalIn', label: 'Stok masuk', value: totalIn, unit: 'pcs' },
+        { key: 'dailySales', label: 'Penjualan harian', value: dailySales, unit: 'pcs/hari' },
+        { key: 'totalOut', label: 'Total penjualan', value: totalOut, unit: 'pcs' },
+    ] as const;
+    return <section className="summary-grid" aria-label="Ringkasan inventori">
+        {cards.map(card => {
+            const baseline = previous?.[card.key];
+            const change = baseline ? (card.value - baseline) / baseline * 100 : null;
+            return <div className="kpi-card" key={card.key}>
+                <p className="kpi-label">{card.label}</p>
+                <p className="kpi-value">{card.value.toLocaleString('id-ID', { maximumFractionDigits: card.key === 'dailySales' ? 1 : 0 })} <span className="kpi-unit">{card.unit}</span></p>
+                <p className="kpi-comparison" title="Dibandingkan dengan rentang tanggal yang digeser satu bulan ke belakang.">
+                    {change !== null ? (change > 0 ? '▲ ' : change < 0 ? '▼ ' : '— ') + Math.abs(change).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + '% vs bulan lalu' : 'Pembanding bulan lalu belum tersedia'}
+                </p>
+                {card.key === 'totalIn' && <p className="kpi-comparison">Retur: {totalReturn.toLocaleString('id-ID')} pcs</p>}
+            </div>;
+        })}
+    </section>;
 }
-
-const SummaryCards: React.FC<SummaryCardsProps> = ({ 
-    totalStock, 
-    totalIn, 
-    totalOut, 
-    totalReturn = 0,
-    dailySales
-}) => {
-    return (
-        <div className="filter-grid mb-8">
-            {/* Total Stock */}
-            <div className="kpi-card kpi-card-stock">
-                <div className="p-3 rounded-xl bg-[#3b82f6]/10">
-                    <Package className="w-6 h-6 text-[#3b82f6]" />
-                </div>
-                <div>
-                    <p className="kpi-label">Total Stock</p>
-                    <p className="kpi-value font-numeric">{totalStock.toLocaleString()}</p>
-                </div>
-            </div>
-
-            {/* Total In */}
-            <div className="kpi-card kpi-card-in">
-                <div className="p-3 rounded-xl bg-[#10b981]/10">
-                    <ArrowUpRight className="w-6 h-6 text-[#10b981]" />
-                </div>
-                <div>
-                    <p className="kpi-label">Total In</p>
-                    <p className="kpi-value font-numeric">+{totalIn.toLocaleString()}</p>
-                </div>
-            </div>
-
-            {/* Daily Sales */}
-            <div className="kpi-card kpi-card-daily">
-                <div className="p-3 rounded-xl bg-[#06b6d4]/10">
-                    <TrendingUp className="w-6 h-6 text-[#06b6d4]" />
-                </div>
-                <div>
-                    <p className="kpi-label">Daily Sales</p>
-                    <p className="kpi-value font-numeric">
-                        {dailySales.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                    </p>
-                </div>
-            </div>
-
-            {/* Total Sales */}
-            <div className="kpi-card kpi-card-sales">
-                <div className="p-3 rounded-xl bg-[#f59e0b]/10">
-                    <ShoppingCart className="w-6 h-6 text-[#f59e0b]" />
-                </div>
-                <div>
-                    <p className="kpi-label">Total Sales</p>
-                    <p className="kpi-value font-numeric">{totalOut.toLocaleString()}</p>
-                </div>
-            </div>
-
-            {/* Total Returned */}
-            <div className="kpi-card kpi-card-returned">
-                <div className="p-3 rounded-xl bg-[#8b5cf6]/10">
-                    <Activity className="w-6 h-6 text-[#8b5cf6]" />
-                </div>
-                <div>
-                    <p className="kpi-label">Total Returned</p>
-                    <p className="kpi-value font-numeric">
-                        +{totalReturn.toLocaleString()}
-                    </p>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export default SummaryCards;

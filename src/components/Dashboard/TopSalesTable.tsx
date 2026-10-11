@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Target, Box, TriangleAlert } from 'lucide-react';
+import { Trophy, Box, TriangleAlert } from 'lucide-react';
 
 interface TopSalesData {
     product: string;
@@ -27,7 +27,7 @@ const TopSalesTable: React.FC<TopSalesTableProps> = ({ data }) => {
     return (
         <div className="card h-full">
             <div className="flex items-center gap-2.5 mb-6">
-                <Trophy className="w-5 h-5 text-[#f59e0b]" />
+                <Trophy className="w-5 h-5 text-[#94a3b8]" />
                 <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em]">Inventory Status Summary</h3>
             </div>
 
@@ -38,12 +38,6 @@ const TopSalesTable: React.FC<TopSalesTableProps> = ({ data }) => {
                             <th className="py-4 px-4 text-left font-bold">Rank</th>
                             <th className="py-4 px-4 text-left font-bold">Item</th>
                             <th className="py-4 px-3 text-center font-bold">Size</th>
-                            <th className="py-4 px-4 text-right font-bold">
-                                <div className="flex items-center justify-end gap-1.5">
-                                    <Target className="w-3.5 h-3.5" />
-                                    <span>Target</span>
-                                </div>
-                            </th>
                             <th className="py-4 px-4 text-right font-bold">
                                 <div className="flex items-center justify-end gap-1.5">
                                     <Box className="w-3.5 h-3.5" />
@@ -81,21 +75,18 @@ const TopSalesTable: React.FC<TopSalesTableProps> = ({ data }) => {
                                              {item.size}
                                          </span>
                                      </td>
-                                     <td className="py-4.5 px-4 text-right font-bold text-[#fbbf24] font-numeric text-[0.92rem]">
-                                         {item.target.toLocaleString()}
-                                     </td>
                                      <td className={`py-4.5 px-4 text-right font-bold font-numeric text-[0.92rem] ${item.isInsufficient ? 'text-[#ff6b6b]' : 'text-[#f1f5f9]'}`}>
                                          <div className="flex items-center justify-end gap-1.5">
                                              {item.hasMismatch && (
                                                  <TriangleAlert className="w-3.5 h-3.5 text-[#ff6b6b]" />
                                              )}
-                                             {item.stock.toLocaleString()}
+                                             {item.stock.toLocaleString('id-ID')}
                                          </div>
                                      </td>
                                      <td className="py-4.5 px-4 text-right">
                                          {stockOutDate ? (
                                              <div className={`text-xs font-bold px-2 py-1 rounded inline-block font-numeric ${isCritical ? 'bg-[#ef4444]/15 text-[#ff6b6b] border border-[#ef4444]/30' : 'bg-[#10b981]/15 text-[#4ade80] border border-[#10b981]/30'}`}>
-                                                 {stockOutDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                 {stockOutDate.toLocaleDateString('id-ID', { month: 'short', day: 'numeric', year: 'numeric' })}
                                              </div>
                                          ) : (
                                              <span className="text-[#94a3b8]/60 italic">N/A</span>
@@ -106,7 +97,7 @@ const TopSalesTable: React.FC<TopSalesTableProps> = ({ data }) => {
                         })}
                         {data.length === 0 && (
                             <tr>
-                                <td colSpan={6} className="py-8 text-center text-[#94a3b8]/60 italic">
+                                <td colSpan={5} className="py-8 text-center text-[#94a3b8]/60 italic">
                                     No items found.
                                 </td>
                             </tr>

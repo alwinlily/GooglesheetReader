@@ -79,7 +79,7 @@ export const KonveksiPerformanceChart: React.FC<KonveksiPerformanceChartProps> =
       <div className="card lg:col-span-2 flex flex-col justify-between">
         <div>
           <div className="flex items-center gap-2 mb-6">
-            <Award className="w-5 h-5 text-[#f59e0b]" />
+            <Award className="w-5 h-5 text-[#94a3b8]" />
             <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em]">Workshop (Konveksi) Performance Qty</h3>
           </div>
 
@@ -95,13 +95,13 @@ export const KonveksiPerformanceChart: React.FC<KonveksiPerformanceChartProps> =
                   margin={{ top: 10, right: 10, left: -10, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
-                  <XAxis dataKey="name" stroke="#64748b" fontSize={11} />
-                  <YAxis stroke="#64748b" fontSize={11} />
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
+                  <YAxis stroke="#64748b" fontSize={12} tickFormatter={(value) => Number(value).toLocaleString('id-ID')} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f1f5f9' }}
-                    itemStyle={{ fontSize: '11px' }}
+                    itemStyle={{ fontSize: '12px' }}
                   />
-                  <Legend verticalAlign="top" height={36} iconSize={10} wrapperStyle={{ fontSize: '11px' }} />
+                  <Legend verticalAlign="top" height={36} iconSize={10} wrapperStyle={{ fontSize: '12px' }} />
                   <Bar
                     dataKey="totalOrderedQty"
                     name="Ordered"
@@ -134,7 +134,7 @@ export const KonveksiPerformanceChart: React.FC<KonveksiPerformanceChartProps> =
       <div className="card flex flex-col justify-between">
         <div>
           <div className="flex items-center gap-2 mb-6">
-            <ShieldAlert className="w-5 h-5 text-[#8b5cf6]" />
+            <ShieldAlert className="w-5 h-5 text-[#94a3b8]" />
             <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em]">Workshop Accuracy KPI</h3>
           </div>
 
@@ -146,17 +146,17 @@ export const KonveksiPerformanceChart: React.FC<KonveksiPerformanceChartProps> =
             <div className="flex flex-col gap-4">
               {bestPerformer && (
                 <div className="p-3 bg-[#10b981]/10 border border-[#10b981]/20 rounded-xl">
-                  <span className="text-[10px] text-[#10b981] font-bold uppercase tracking-wider block mb-1">👑 Top Fulfillment Accuracy</span>
+                  <span className="text-xs text-[#10b981] font-bold uppercase tracking-wider block mb-1">👑 Top Fulfillment Accuracy</span>
                   <div className="flex justify-between items-baseline">
                     <strong className="text-[#f1f5f9] text-base font-extrabold">{bestPerformer.name}</strong>
                     <span className="text-[#10b981] text-sm font-black font-mono">{bestPerformer.fulfillmentRate}% accuracy</span>
                   </div>
-                  <p className="text-[10px] text-[#94a3b8] mt-1">Successfully fulfilled {bestPerformer.totalReceivedQty.toLocaleString()} out of {bestPerformer.totalOrderedQty.toLocaleString()} items.</p>
+                  <p className="text-xs text-[#94a3b8] mt-1">Berhasil memenuhi {bestPerformer.totalReceivedQty.toLocaleString('id-ID')} dari {bestPerformer.totalOrderedQty.toLocaleString('id-ID')} pcs.</p>
                 </div>
               )}
 
               <div className="flex flex-col gap-2 mt-2">
-                <span className="text-[10px] text-[#64748b] font-bold uppercase tracking-wider block mb-1">All Workshop Scores</span>
+                <span className="text-xs text-[#94a3b8] font-bold uppercase tracking-wider block mb-1">All Workshop Scores</span>
                 {performanceData.map((p) => (
                   <div key={p.name} className="flex flex-col gap-1 border-b border-[#334155]/20 pb-2 last:border-0">
                     <div className="flex justify-between text-xs font-semibold">
@@ -172,7 +172,7 @@ export const KonveksiPerformanceChart: React.FC<KonveksiPerformanceChartProps> =
                         style={{ width: `${Math.min(100, p.fulfillmentRate)}%` }}
                       />
                     </div>
-                    <div className="flex justify-between text-[10px] text-[#64748b] font-mono">
+                    <div className="flex justify-between text-xs text-[#94a3b8] font-mono">
                       <span>Orders: {p.totalOrders} ({p.activeOrders} active)</span>
                       <span>Rejects: {p.totalRejectedQty}</span>
                     </div>

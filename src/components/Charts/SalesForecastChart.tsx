@@ -23,10 +23,11 @@ const SalesForecastChart: React.FC<SalesForecastChartProps> = ({ data, productNa
                     <XAxis
                         dataKey="date"
                         stroke="#8b949e"
-                        fontSize={10}
+                        fontSize={12}
+                        minTickGap={40}
                         tickFormatter={(str) => {
                             const date = new Date(str);
-                            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                            return date.toLocaleDateString('id-ID', { month: 'short', day: 'numeric' });
                         }}
                     />
                     <YAxis stroke="#8b949e" fontSize={12} />
@@ -37,7 +38,7 @@ const SalesForecastChart: React.FC<SalesForecastChartProps> = ({ data, productNa
                             const date = new Date(label);
                             const pastDate = new Date(date);
                             pastDate.setMonth(date.getMonth() - 1);
-                            return `Forecast: ${date.toLocaleDateString()} (vs ${pastDate.toLocaleDateString()})`;
+                            return `Proyeksi: ${date.toLocaleDateString('id-ID')} (vs ${pastDate.toLocaleDateString('id-ID')})`;
                         }}
                     />
                     <Legend verticalAlign="bottom" height={36} />
@@ -48,8 +49,8 @@ const SalesForecastChart: React.FC<SalesForecastChartProps> = ({ data, productNa
                         dataKey="pastActual"
                         stroke="#a371f7"
                         strokeWidth={2}
-                        dot={{ r: 3, fill: "#a371f7" }}
-                        activeDot={{ r: 5 }}
+                        dot={false}
+                        activeDot={{ r: 4 }}
                         connectNulls
                     />
                     <Line

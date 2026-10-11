@@ -1,14 +1,7 @@
 import type { OrderRecord, OrderStatus } from '../types/order';
 
-function looksLikeDate(val: any): boolean {
-  if (val === undefined || val === null) return false;
-  const str = String(val).trim();
-  const parts = str.split(/[/\-.]/).map(p => p.trim());
-  return parts.length === 3 && !parts.some(p => isNaN(Number(p)));
-}
-
 // Convert DD/MM/YY or DD/MM/YYYY to YYYY-MM-DD
-function parseOrderDate(rawDate: string): string | null {
+function parseOrderDate(rawDate: unknown): string | null {
   if (!rawDate) return null;
   const parts = String(rawDate).trim().split(/[/\-.]/).map(p => p.trim());
   if (parts.length !== 3) return null;
@@ -33,11 +26,12 @@ function parseOrderDate(rawDate: string): string | null {
   }
 
   const dateStr = `${year}-${month}-${day}`;
-  const d = new Date(dateStr);
-  return isNaN(d.getTime()) ? null : dateStr;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === dateStr ? dateStr : null;
 }
 
-export function parseGoogleSheetsOrderData(rows: any[][]): OrderRecord[] {
+export function parseGoogleSheetsOrderData(rows: unknown[][]): OrderRecord[] {
   if (rows.length < 2) return [];
 
   const headers = rows[0].map(h => String(h).trim().toLowerCase());
@@ -54,25 +48,27 @@ export function parseGoogleSheetsOrderData(rows: any[][]): OrderRecord[] {
   const selisihIdx = headers.findIndex(h => h === "selisih" || h === "diff" || h === "difference");
   const totalInIdx = headers.findIndex(h => h === "total in" || h === "total_in" || h === "total");
 
+  if (dateOrderIdx === -1 || brandIdx === -1 || itemIdx === -1 || quantityIdx === -1) {
+    throw new Error('Kolom Date Order, Brand, Item, atau Quantity tidak ditemukan di tab Order.');
+  }
+
   const records: OrderRecord[] = [];
 
-  rows.slice(1).forEach((row) => {
-    // Check if the row has a valid date order to be considered a record
+  rows.slice(1).forEach((row, index) => {
+    // An item identifies a record. A missing date must not erase received stock.
+    const item = String(row[itemIdx] ?? '').trim();
+    if (!item) return;
     const rawDateOrder = dateOrderIdx !== -1 && dateOrderIdx < row.length ? row[dateOrderIdx] : null;
-    if (!rawDateOrder || !looksLikeDate(rawDateOrder)) return;
-
-    const dateOrder = parseOrderDate(rawDateOrder);
-    if (!dateOrder) return;
+    const dateOrder = parseOrderDate(rawDateOrder) ?? '';
 
     const konveksi = konveksiIdx !== -1 && konveksiIdx < row.length ? String(row[konveksiIdx]).trim() : "Unknown";
     const brand = brandIdx !== -1 && brandIdx < row.length ? String(row[brandIdx]).trim() : "Unknown";
-    const item = itemIdx !== -1 && itemIdx < row.length ? String(row[itemIdx]).trim() : "Unknown";
     
     const rawQty = quantityIdx !== -1 && quantityIdx < row.length ? row[quantityIdx] : "";
     const quantity = rawQty === "" || isNaN(Number(rawQty)) ? 0 : Number(rawQty);
 
     const rawDateReceived = dateReceivedIdx !== -1 && dateReceivedIdx < row.length ? row[dateReceivedIdx] : null;
-    const dateReceived = rawDateReceived && looksLikeDate(rawDateReceived) ? parseOrderDate(rawDateReceived) : null;
+    const dateReceived = parseOrderDate(rawDateReceived);
 
     const rawIn = inIdx !== -1 && inIdx < row.length ? row[inIdx] : "";
     const inVal = rawIn === "" || isNaN(Number(rawIn)) ? 0 : Number(rawIn);
@@ -100,6 +96,7 @@ export function parseGoogleSheetsOrderData(rows: any[][]): OrderRecord[] {
     }
 
     records.push({
+      sourceRow: index + 2,
       dateOrder,
       konveksi,
       brand,

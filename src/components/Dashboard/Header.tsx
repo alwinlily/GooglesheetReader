@@ -5,15 +5,26 @@ interface HeaderProps {
     onRefresh: () => void;
     loading: boolean;
     onExportPDF?: () => void;
+    children?: React.ReactNode;
+    title?: string;
+    subtitle?: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ onRefresh, loading, onExportPDF }) => {
+const Header: React.FC<HeaderProps> = ({ 
+    onRefresh, 
+    loading, 
+    onExportPDF, 
+    children, 
+    title = "Inventory Dashboard",
+    subtitle = "Pantau stok dan rencanakan pemesanan."
+}) => {
     return (
         <header className="dashboard-header">
             <div>
-                <h1 className="header-title">Inventory Dashboard</h1>
-                <p className="header-subtitle">Real time data tracker. Jangan Lupa Update setiap hari!</p>
+                <h1 className="header-title">{title}</h1>
+                <p className="header-subtitle">{subtitle}</p>
             </div>
+            {children}
             <div className="flex gap-3 items-center">
                 <button
                     className="btn-header-refresh text-xs md:text-sm"

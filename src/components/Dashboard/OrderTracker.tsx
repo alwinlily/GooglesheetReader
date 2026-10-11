@@ -11,6 +11,7 @@ import {
 import type { OrderRecord } from '../../types/order';
 import { OrderAccuracyChart } from '../Charts/OrderAccuracyChart';
 import { KonveksiPerformanceChart } from '../Charts/KonveksiPerformanceChart';
+import { formatFullDate } from '../../utils/dateUtils';
 
 interface OrderTrackerProps {
   orders: OrderRecord[];
@@ -18,6 +19,17 @@ interface OrderTrackerProps {
   error: string | null;
   uniqueKonveksi: string[];
 }
+
+const getFulfillmentDuration = (dateOrder: string, dateReceived: string | null) => {
+  if (!dateOrder || !dateReceived) return 'Belum tersedia';
+
+  const start = new Date(`${dateOrder}T00:00:00Z`);
+  const end = new Date(`${dateReceived}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'Belum tersedia';
+
+  const days = Math.floor((end.getTime() - start.getTime()) / 86_400_000);
+  return days < 0 ? 'Belum tersedia' : `${days.toLocaleString('id-ID')} hari`;
+};
 
 export const OrderTracker: React.FC<OrderTrackerProps> = ({ 
   orders, 
@@ -47,16 +59,29 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
     setCurrentPage(1);
   }, [searchTerm, selectedVendor, selectedStatus]);
 
+  useEffect(() => {
+    if (selectedVendor !== 'All' && !uniqueKonveksi.includes(selectedVendor)) {
+      setSelectedVendor('All');
+    }
+  }, [selectedVendor, uniqueKonveksi]);
+
 
 
   // Helper: calculate days elapsed since order date
   const getDaysElapsed = (dateStr: string) => {
+    if (!dateStr) return null;
     const start = new Date(dateStr);
+    if (Number.isNaN(start.getTime())) return null;
     const today = new Date();
     const diff = today.getTime() - start.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     return days >= 0 ? days : 0;
   };
+
+  const missingOrderDates = useMemo(
+    () => orders.filter((o) => !o.dateOrder),
+    [orders]
+  );
 
   // --- 1. Calculate General Order Summary Stats ---
   const stats = useMemo(() => {
@@ -136,19 +161,21 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
     return orders.filter((o) => o.status === 'In Production');
   }, [orders]);
 
-  // Compute unique active vendors from raw data for the filter dropdown
-  const activeVendors = useMemo(() => {
-    const list = activeOrdersList.map(o => o.konveksi);
-    return Array.from(new Set(list)).sort();
-  }, [activeOrdersList]);
+
+  useEffect(() => {
+    if (activeVendorFilter !== 'All' && !uniqueKonveksi.includes(activeVendorFilter)) {
+      setActiveVendorFilter('All');
+    }
+  }, [activeVendorFilter, uniqueKonveksi]);
 
   const filteredActiveOrders = useMemo(() => {
     return activeOrdersList
       .filter((o) => {
         const days = getDaysElapsed(o.dateOrder);
-        let bucket = 'aman';
-        if (days > AMBANG_KRITIS) bucket = 'kritis';
-        else if (days >= AMBANG_PANTAU) bucket = 'pantau';
+        let bucket = 'unknown';
+        if (days !== null) {
+          bucket = days > AMBANG_KRITIS ? 'kritis' : days >= AMBANG_PANTAU ? 'pantau' : 'aman';
+        }
 
         const matchVendor = activeVendorFilter === 'All' || o.konveksi === activeVendorFilter;
         const matchAge = activeAgeFilter === 'All' || bucket === activeAgeFilter;
@@ -161,18 +188,20 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
     const list = filteredActiveOrders;
     const totalOrders = list.length;
     const totalPcs = list.reduce((sum, o) => sum + o.quantity, 0);
-    const uniqueBatches = new Set(list.map(o => o.dateOrder));
+    const uniqueBatches = new Set(list.filter(o => o.dateOrder).map(o => o.dateOrder));
     const uniqueVendors = new Set(list.map(o => o.konveksi));
     
-    const totalDaysPcs = list.reduce((sum, o) => sum + getDaysElapsed(o.dateOrder) * o.quantity, 0);
-    const rataUmurTertimbang = totalPcs > 0 ? Math.round(totalDaysPcs / totalPcs) : 0;
+    const datedList = list.filter(o => getDaysElapsed(o.dateOrder) !== null);
+    const datedPcs = datedList.reduce((sum, o) => sum + o.quantity, 0);
+    const totalDaysPcs = datedList.reduce((sum, o) => sum + (getDaysElapsed(o.dateOrder) ?? 0) * o.quantity, 0);
+    const rataUmurTertimbang = datedPcs > 0 ? Math.round(totalDaysPcs / datedPcs) : 0;
     
     // Dynamic critical konveksi
     const criticalKonveksis = Array.from(new Set(
-      list.filter(o => getDaysElapsed(o.dateOrder) > AMBANG_KRITIS).map(o => o.konveksi)
+      list.filter(o => (getDaysElapsed(o.dateOrder) ?? -1) > AMBANG_KRITIS).map(o => o.konveksi)
     )).sort();
     const criticalKonveksiText = criticalKonveksis.length > 0 ? criticalKonveksis.join(', ') : '';
-    const criticalOrdersCount = list.filter(o => getDaysElapsed(o.dateOrder) > AMBANG_KRITIS).length;
+    const criticalOrdersCount = list.filter(o => (getDaysElapsed(o.dateOrder) ?? -1) > AMBANG_KRITIS).length;
 
     return {
       totalOrders,
@@ -186,7 +215,7 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
   }, [filteredActiveOrders]);
 
   const completedDurations = useMemo(() => {
-    const completed = orders.filter(o => o.dateReceived && o.status !== 'In Production');
+    const completed = orders.filter(o => o.dateOrder && o.dateReceived && o.status !== 'In Production');
     if (completed.length === 0) return { min: 0, max: 0 };
     
     const durations = completed.map(o => {
@@ -213,6 +242,7 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
 
     filteredActiveOrders.forEach(o => {
       const days = getDaysElapsed(o.dateOrder);
+      if (days === null) return;
       let bucket: 'aman' | 'pantau' | 'kritis' = 'aman';
       if (days > AMBANG_KRITIS) bucket = 'kritis';
       else if (days >= AMBANG_PANTAU) bucket = 'pantau';
@@ -230,9 +260,7 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
     
     filteredActiveOrders.forEach(o => {
       const days = getDaysElapsed(o.dateOrder);
-      let bucket: 'aman' | 'pantau' | 'kritis' = 'aman';
-      if (days > AMBANG_KRITIS) bucket = 'kritis';
-      else if (days >= AMBANG_PANTAU) bucket = 'pantau';
+      const bucket = days === null ? null : days > AMBANG_KRITIS ? 'kritis' : days >= AMBANG_PANTAU ? 'pantau' : 'aman';
 
       if (!load[o.konveksi]) {
         load[o.konveksi] = {
@@ -245,7 +273,7 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
       const kl = load[o.konveksi];
       kl.totalOrders += 1;
       kl.totalPcs += o.quantity;
-      kl.pcsPerBucket[bucket] += o.quantity;
+      if (bucket) kl.pcsPerBucket[bucket] += o.quantity;
     });
 
     return Object.values(load).sort((a, b) => b.totalPcs - a.totalPcs);
@@ -253,15 +281,14 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
 
   // Batches (Section A.3)
   const batchesList = useMemo(() => {
-    const groups: Record<string, { tanggalMulai: string; umurHari: number; items: OrderRecord[]; totalPcs: number; konveksiList: string[]; bucket: 'aman' | 'pantau' | 'kritis'; label: string }> = {};
+    const groups: Record<string, { tanggalMulai: string; umurHari: number | null; items: OrderRecord[]; totalPcs: number; konveksiList: string[]; bucket: 'aman' | 'pantau' | 'kritis' | 'unknown'; label: string }> = {};
 
     filteredActiveOrders.forEach(o => {
       const date = o.dateOrder;
       if (!groups[date]) {
         const days = getDaysElapsed(date);
-        let bucket: 'aman' | 'pantau' | 'kritis' = 'aman';
-        if (days > AMBANG_KRITIS) bucket = 'kritis';
-        else if (days >= AMBANG_PANTAU) bucket = 'pantau';
+        let bucket: 'aman' | 'pantau' | 'kritis' | 'unknown' = 'unknown';
+        if (days !== null) bucket = days > AMBANG_KRITIS ? 'kritis' : days >= AMBANG_PANTAU ? 'pantau' : 'aman';
 
         groups[date] = {
           tanggalMulai: date,
@@ -286,11 +313,14 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
       return g;
     });
 
-    return result.sort((a, b) => b.umurHari - a.umurHari);
+    return result.sort((a, b) => (b.umurHari ?? -1) - (a.umurHari ?? -1));
   }, [filteredActiveOrders]);
 
   const getAgeIndicator = (o: OrderRecord) => {
     const days = getDaysElapsed(o.dateOrder);
+    if (days === null) {
+      return { colorClass: 'bg-[#64748b]', textClass: 'text-[#94a3b8] font-bold', labelText: 'Tanggal belum diisi' };
+    }
     let colorClass = 'bg-[var(--status-aman)]';
     let textClass = 'text-[var(--status-aman)] font-bold';
     if (days > AMBANG_KRITIS) {
@@ -387,6 +417,10 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
 
   // Pagination calculations
   const totalPages = Math.ceil(sortedOrders.length / rowsPerPage);
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, Math.max(1, totalPages)));
+  }, [totalPages]);
+
   const paginatedOrders = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
     return sortedOrders.slice(start, start + rowsPerPage);
@@ -432,10 +466,10 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
         
         <div className="card stats-card flex flex-col justify-between">
           <div>
-            <span className="text-[10px] text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Active Production</span>
+            <span className="text-xs text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Active Production</span>
             <strong className="text-2xl text-[#f1f5f9] font-extrabold">{stats.activeCount} Items</strong>
           </div>
-          <span className="text-[10px] text-amber-500 flex items-center gap-1 font-bold mt-2">
+          <span className="text-xs text-amber-500 flex items-center gap-1 font-bold mt-2">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
             In Production
           </span>
@@ -443,30 +477,30 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
 
         <div className="card stats-card flex flex-col justify-between">
           <div>
-            <span className="text-[10px] text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Total Ordered Qty</span>
-            <strong className="text-2xl text-[#f1f5f9] font-extrabold">{stats.totalQtyOrdered.toLocaleString()} Pcs</strong>
+            <span className="text-xs text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Total Ordered Qty</span>
+            <strong className="text-2xl text-[#f1f5f9] font-extrabold">{stats.totalQtyOrdered.toLocaleString('id-ID')} pcs</strong>
           </div>
-          <span className="text-[10px] text-blue-500 flex items-center gap-1 font-bold mt-2">
+          <span className="text-xs text-blue-500 flex items-center gap-1 font-bold mt-2">
             <Package className="w-3.5 h-3.5" /> Total Quantity
           </span>
         </div>
 
         <div className="card stats-card flex flex-col justify-between">
           <div>
-            <span className="text-[10px] text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Total Received Qty</span>
-            <strong className="text-2xl text-[#10b981] font-extrabold">{stats.totalQtyReceived.toLocaleString()} Pcs</strong>
+            <span className="text-xs text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Total Received Qty</span>
+            <strong className="text-2xl text-[#10b981] font-extrabold">{stats.totalQtyReceived.toLocaleString('id-ID')} pcs</strong>
           </div>
-          <span className="text-[10px] text-[#10b981] flex items-center gap-1 font-bold mt-2">
+          <span className="text-xs text-[#10b981] flex items-center gap-1 font-bold mt-2">
             <CheckCircle className="w-3.5 h-3.5" /> Fulfilled successfully
           </span>
         </div>
 
         <div className="card stats-card flex flex-col justify-between">
           <div>
-            <span className="text-[10px] text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Defects / Reject</span>
-            <strong className="text-2xl text-[#ef4444] font-extrabold">{stats.totalQtyRejected.toLocaleString()} Pcs</strong>
+            <span className="text-xs text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Defects / Reject</span>
+            <strong className="text-2xl text-[#ef4444] font-extrabold">{stats.totalQtyRejected.toLocaleString('id-ID')} pcs</strong>
           </div>
-          <span className="text-[10px] text-[#ef4444] flex items-center gap-1 font-bold mt-2">
+          <span className="text-xs text-[#ef4444] flex items-center gap-1 font-bold mt-2">
             <XCircle className="w-3.5 h-3.5" /> Rejected items
           </span>
         </div>
@@ -497,7 +531,7 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
               onChange={(e) => setActiveVendorFilter(e.target.value)}
             >
               <option value="All">Semua Konveksi</option>
-              {activeVendors.map((k) => (
+              {uniqueKonveksi.map((k) => (
                 <option key={k} value={k}>{k}</option>
               ))}
             </select>
@@ -524,40 +558,40 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
           {/* Tile 1 */}
           <div className="bg-[#1e293b]/40 border border-[#334155]/40 rounded-xl p-4 flex flex-col justify-between">
             <div>
-              <span className="text-[9px] text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Order Aktif</span>
+              <span className="text-xs text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Order Aktif</span>
               <strong className="text-2xl text-[#f1f5f9] font-extrabold">{activeSummary.totalOrders} order</strong>
             </div>
-            <span className="text-[10px] text-[#9ca3af] mt-2 block font-medium">dalam {activeSummary.jumlahBatch} batch</span>
+            <span className="text-xs text-[#9ca3af] mt-2 block font-medium">dalam {activeSummary.jumlahBatch.toLocaleString('id-ID')} batch</span>
           </div>
 
           {/* Tile 2 */}
           <div className="bg-[#1e293b]/40 border border-[#334155]/40 rounded-xl p-4 flex flex-col justify-between">
             <div>
-              <span className="text-[9px] text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Volume Berjalan</span>
-              <strong className="text-2xl text-[#f1f5f9] font-extrabold">{activeSummary.totalPcs.toLocaleString()} pcs</strong>
+              <span className="text-xs text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Volume Berjalan</span>
+              <strong className="text-2xl text-[#f1f5f9] font-extrabold">{activeSummary.totalPcs.toLocaleString('id-ID')} pcs</strong>
             </div>
-            <span className="text-[10px] text-[#9ca3af] mt-2 block font-medium">di {activeSummary.jumlahKonveksi} konveksi</span>
+            <span className="text-xs text-[#9ca3af] mt-2 block font-medium">di {activeSummary.jumlahKonveksi.toLocaleString('id-ID')} konveksi</span>
           </div>
 
           {/* Tile 3 */}
           <div className="bg-[#1e293b]/40 border border-[#334155]/40 rounded-xl p-4 flex flex-col justify-between">
             <div>
-              <span className="text-[9px] text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Durasi Selesai</span>
+              <span className="text-xs text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Durasi Selesai</span>
               <strong className="text-2xl text-[#f1f5f9] font-extrabold">{completedDurations.min} — {completedDurations.max} hari</strong>
             </div>
-            <span className="text-[10px] text-[#9ca3af] mt-2 block font-medium">Tercepat: {completedDurations.min} hari · Terlama: {completedDurations.max} hari</span>
+            <span className="text-xs text-[#9ca3af] mt-2 block font-medium">Tercepat: {completedDurations.min.toLocaleString('id-ID')} hari · Terlama: {completedDurations.max.toLocaleString('id-ID')} hari</span>
           </div>
 
           {/* Tile 4 */}
           <div className="bg-[#1e293b]/40 border border-[#334155]/40 rounded-xl p-4 flex flex-col justify-between">
             <div>
-              <span className="text-[9px] text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Lewat 20 Hari</span>
+              <span className="text-xs text-[#9ca3af] font-bold uppercase tracking-wider block mb-1">Lewat 20 Hari</span>
               {activeSummary.criticalOrdersCount > 0 ? (
                 <>
                   <strong className="text-2xl font-extrabold text-[var(--status-kritis)]">
                     {bucketTotals.kritis.pcs} pcs
                   </strong>
-                  <span className="text-[10px] text-[#9ca3af] mt-2 flex items-center gap-1 font-semibold truncate" title={`${activeSummary.criticalOrdersCount} order · ${activeSummary.criticalKonveksiText}`}>
+                  <span className="text-xs text-[#9ca3af] mt-2 flex items-center gap-1 font-semibold truncate" title={`${activeSummary.criticalOrdersCount} order · ${activeSummary.criticalKonveksiText}`}>
                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--status-kritis)] shrink-0" />
                     {activeSummary.criticalOrdersCount} order · {activeSummary.criticalKonveksiText}
                   </span>
@@ -567,7 +601,7 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
                   <strong className="text-2xl font-extrabold text-[var(--status-aman)]">
                     tidak ada
                   </strong>
-                  <span className="text-[10px] text-[var(--status-aman)] mt-2 flex items-center gap-1 font-semibold">
+                  <span className="text-xs text-[var(--status-aman)] mt-2 flex items-center gap-1 font-semibold">
                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--status-aman)] shrink-0" />
                     0 order
                   </span>
@@ -725,20 +759,21 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
           ) : (
             <div className="flex flex-col gap-5">
               {(() => {
-                const maxAge = Math.max(...batchesList.map(b => b.umurHari), 1);
+                const maxAge = Math.max(...batchesList.map(b => b.umurHari ?? 0), 1);
                 const scaleMax = Math.ceil(maxAge / 10) * 10;
 
                 return (
                   <>
                     {batchesList.map((batch) => {
-                      const barWidth = Math.max(2, (batch.umurHari / scaleMax) * 100);
+                      const barWidth = batch.umurHari === null ? 2 : Math.max(2, (batch.umurHari / scaleMax) * 100);
                       let barColor = 'bg-[var(--status-aman)]';
                       if (batch.bucket === 'kritis') barColor = 'bg-[var(--status-kritis)]';
                       else if (batch.bucket === 'pantau') barColor = 'bg-[var(--status-pantau)]';
+                      else if (batch.bucket === 'unknown') barColor = 'bg-[#64748b]';
 
                       const dateObj = new Date(batch.tanggalMulai);
                       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-                      const dateLabel = `${dateObj.getDate()} ${months[dateObj.getMonth()]}`;
+                      const dateLabel = batch.tanggalMulai ? `${dateObj.getDate()} ${months[dateObj.getMonth()]}` : 'Tanggal belum diisi';
 
                       return (
                         <div key={batch.tanggalMulai} className="grid grid-cols-[186px_1fr_96px] items-center gap-4">
@@ -778,7 +813,7 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
                           {/* Right Column: Numbers */}
                           <div className="flex flex-col text-right shrink-0">
                             <span className="text-xs font-bold font-mono text-[#f1f5f9] tabular-nums">
-                              {batch.umurHari} hari
+                              {batch.umurHari === null ? 'Umur tidak dihitung' : `${batch.umurHari.toLocaleString('id-ID')} hari`}
                             </span>
                             <span className="text-[10px] text-[#9ca3af] font-mono mt-0.5 tabular-nums">
                               {batch.totalPcs} pcs
@@ -845,7 +880,7 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
 
                   const dateObj = new Date(batch.tanggalMulai);
                   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-                  const dateLabel = `${dateObj.getDate()} ${months[dateObj.getMonth()]}`;
+                  const dateLabel = batch.tanggalMulai ? `${dateObj.getDate()} ${months[dateObj.getMonth()]}` : 'Tanggal belum diisi';
 
                   const toggleBatch = () => {
                     setCollapsedBatches(prev => ({
@@ -883,7 +918,7 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
                           </div>
                         </td>
                         <td colSpan={2} className="py-3.5 px-4 text-right font-bold text-[#9ca3af]">
-                          <span className="font-mono tabular-nums">{batch.items.length} order</span> · <span className="font-mono tabular-nums">{batch.totalPcs} pcs</span> · <span className="font-mono text-[#f1f5f9]">{batch.umurHari} hari</span>
+                          <span className="font-mono tabular-nums">{batch.items.length.toLocaleString('id-ID')} order</span> · <span className="font-mono tabular-nums">{batch.totalPcs.toLocaleString('id-ID')} pcs</span> · <span className="font-mono text-[#f1f5f9]">{batch.umurHari === null ? 'umur tidak dihitung' : `${batch.umurHari.toLocaleString('id-ID')} hari`}</span>
                         </td>
                       </tr>
 
@@ -902,10 +937,10 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
                               {item.konveksi}
                             </td>
                             <td className="py-3 px-4 text-[#9ca3af] font-mono">
-                              {item.dateOrder}
+                              {item.dateOrder ? formatFullDate(item.dateOrder) : 'Belum diisi'}
                             </td>
                             <td className="py-3 px-4 text-right font-mono tabular-nums text-[#f1f5f9]">
-                              {item.quantity.toLocaleString()}
+                              {item.quantity.toLocaleString('id-ID')}
                             </td>
                             <td className="py-3 px-4 text-right">
                               <span className={`inline-flex items-center gap-1.5 ${age.textClass}`}>
@@ -940,7 +975,7 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
           <div className="flex flex-col gap-4">
             {/* Summary Line */}
             <div className="text-xs text-[#9ca3af] font-semibold border-b border-[#334155]/30 pb-3">
-              ⚠️ {alertSummary.count} order bermasalah · total kurang <strong className="text-rose-400 font-mono">{alertSummary.totalKurang.toLocaleString()} pcs</strong> · total lebih <strong className="text-indigo-400 font-mono">{alertSummary.totalLebih.toLocaleString()} pcs</strong>
+              ⚠️ {alertSummary.count.toLocaleString('id-ID')} order bermasalah · total kurang <strong className="text-rose-400 font-mono">{alertSummary.totalKurang.toLocaleString('id-ID')} pcs</strong> · total lebih <strong className="text-indigo-400 font-mono">{alertSummary.totalLebih.toLocaleString('id-ID')} pcs</strong>
             </div>
 
             {/* Split Columns (Kurang vs Lebih) */}
@@ -963,10 +998,13 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
                         <div key={idx} className="flex justify-between items-center py-2.5 px-3 bg-[#1e293b]/20 hover:bg-[#1e293b]/55 border border-[#334155]/20 rounded-xl transition duration-150">
                           <div className="flex flex-col gap-0.5 pr-3 min-w-0">
                             <strong className="text-xs text-[#f1f5f9] font-semibold truncate" title={item.item}>{item.item}</strong>
-                            <span className="text-[10px] text-[#9ca3af]">{item.konveksi} · selesai {item.dateReceived}</span>
+                            <span className="text-xs text-[#9ca3af]">{item.konveksi}</span>
+                            <span className="text-xs text-[#9ca3af]">Order tanggal: {item.dateOrder ? formatFullDate(item.dateOrder) : 'Belum tersedia'}</span>
+                            <span className="text-xs text-[#9ca3af]">Selesai tanggal: {item.dateReceived ? formatFullDate(item.dateReceived) : 'Belum tersedia'}</span>
+                            <span className="text-xs text-[#9ca3af]">Total hari: {getFulfillmentDuration(item.dateOrder, item.dateReceived)}</span>
                           </div>
                           <div className="flex items-center gap-4 text-xs font-mono shrink-0">
-                            <span className="text-[#9ca3af] tabular-nums">{item.quantity} → {item.in}</span>
+                            <span className="text-[#9ca3af] tabular-nums">{item.quantity.toLocaleString('id-ID')} → {item.in.toLocaleString('id-ID')}</span>
                             <span className="font-extrabold tabular-nums text-right w-[100px] text-rose-400">
                               {item.selisih} ({pct}%)
                             </span>
@@ -995,10 +1033,13 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
                         <div key={idx} className="flex justify-between items-center py-2.5 px-3 bg-[#1e293b]/20 hover:bg-[#1e293b]/55 border border-[#334155]/20 rounded-xl transition duration-150">
                           <div className="flex flex-col gap-0.5 pr-3 min-w-0">
                             <strong className="text-xs text-[#f1f5f9] font-semibold truncate" title={item.item}>{item.item}</strong>
-                            <span className="text-[10px] text-[#9ca3af]">{item.konveksi} · selesai {item.dateReceived}</span>
+                            <span className="text-xs text-[#9ca3af]">{item.konveksi}</span>
+                            <span className="text-xs text-[#9ca3af]">Order tanggal: {item.dateOrder ? formatFullDate(item.dateOrder) : 'Belum tersedia'}</span>
+                            <span className="text-xs text-[#9ca3af]">Selesai tanggal: {item.dateReceived ? formatFullDate(item.dateReceived) : 'Belum tersedia'}</span>
+                            <span className="text-xs text-[#9ca3af]">Total hari: {getFulfillmentDuration(item.dateOrder, item.dateReceived)}</span>
                           </div>
                           <div className="flex items-center gap-4 text-xs font-mono shrink-0">
-                            <span className="text-[#9ca3af] tabular-nums">{item.quantity} → {item.in}</span>
+                            <span className="text-[#9ca3af] tabular-nums">{item.quantity.toLocaleString('id-ID')} → {item.in.toLocaleString('id-ID')}</span>
                             <span className="font-extrabold tabular-nums text-right w-[100px] text-indigo-400">
                               +{item.selisih} (+{pct}%)
                             </span>
@@ -1039,6 +1080,19 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
             <p className="text-[11px] text-[#9ca3af] mt-1 font-semibold">
               Menampilkan {sortedOrders.length} dari {orders.length} order
             </p>
+            {missingOrderDates.length > 0 && (
+              <details className="mt-2 text-xs text-amber-300">
+                <summary className="cursor-pointer font-semibold">
+                  {missingOrderDates.length.toLocaleString('id-ID')} order tanpa tanggal order
+                </summary>
+                <ul className="mt-2 max-h-32 overflow-auto space-y-1 text-[#cbd5e1]">
+                  {missingOrderDates.map((o, index) => {
+                    const sourceRow = o.sourceRow;
+                    return <li key={`${sourceRow ?? index}-${o.item}`}>Baris {sourceRow ?? '—'} · {o.item}</li>;
+                  })}
+                </ul>
+              </details>
+            )}
           </div>
 
           {/* Search & Filter Bar */}
@@ -1155,19 +1209,19 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
                   const keyStr = `ledger-row-${idx}`;
                   return (
                     <tr key={keyStr} className="even:bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
-                      <td className="py-3 px-4 font-mono text-[#9ca3af]">{o.dateOrder}</td>
+                      <td className="py-3 px-4 font-mono text-[#9ca3af]">{o.dateOrder ? formatFullDate(o.dateOrder) : 'Belum diisi'}</td>
                       <td className="py-3 px-4 font-semibold text-[#f1f5f9] break-words">{o.item}</td>
                       <td className="py-3 px-4 text-[#e2e8f0] font-medium">{o.konveksi}</td>
-                      <td className="py-3 px-4 text-right font-mono tabular-nums text-[#f1f5f9]">{o.quantity.toLocaleString()}</td>
+                      <td className="py-3 px-4 text-right font-mono tabular-nums text-[#f1f5f9]">{o.quantity.toLocaleString('id-ID')}</td>
                       
                       {/* Combined Diterima column */}
                       <td className="py-3 px-4 text-left font-mono text-[#9ca3af]">
-                        {isInProd ? '—' : `${o.dateReceived} · ${o.in.toLocaleString()}`}
+                        {isInProd ? '—' : `${formatFullDate(o.dateReceived ?? '')} · ${o.in.toLocaleString('id-ID')}`}
                       </td>
                       
                       {showRejectColumn && (
                         <td className="py-3 px-4 text-right font-mono tabular-nums text-[#ef4444]">
-                          {o.reject > 0 ? o.reject.toLocaleString() : '—'}
+                          {o.reject > 0 ? o.reject.toLocaleString('id-ID') : '—'}
                         </td>
                       )}
                       

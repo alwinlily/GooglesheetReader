@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { OrderRecord } from '../types/order';
 import { parseGoogleSheetsOrderData } from '../utils/orderParser';
-import rawOrderMock from '../data/rawOrderData.json';
 
 export function useOrderData(activeBrand: 'Kaos Dika' | 'Marapthon') {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
@@ -16,13 +15,10 @@ export function useOrderData(activeBrand: 'Kaos Dika' | 'Marapthon') {
       const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
 
       if (!sheetId || !apiKey) {
-        console.warn('VITE_SHEET_ID or VITE_GOOGLE_API_KEY is missing. Falling back to local order mock data.');
-        const parsed = parseGoogleSheetsOrderData(rawOrderMock.values);
-        setOrders(parsed);
-        return;
+        throw new Error('Koneksi Google Sheets belum dikonfigurasi. Data order tidak dapat dimuat.');
       }
 
-      const orderRange = 'Order!A1:J1000';
+      const orderRange = 'Order!A:J';
       const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(orderRange)}?key=${apiKey}`;
 
       const response = await fetch(url);
@@ -38,16 +34,10 @@ export function useOrderData(activeBrand: 'Kaos Dika' | 'Marapthon') {
 
       const parsed = parseGoogleSheetsOrderData(result.values);
       setOrders(parsed);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Fetch order error:', err);
-      setError(err.message || 'Failed to fetch order data');
-      // Fallback to mock data in case of error too
-      try {
-        const parsed = parseGoogleSheetsOrderData(rawOrderMock.values);
-        setOrders(parsed);
-      } catch (mockErr) {
-        console.error('Mock order fallback failed:', mockErr);
-      }
+      setError(err instanceof Error ? err.message : 'Failed to fetch order data');
+      setOrders([]);
     } finally {
       setLoading(false);
     }

@@ -53,7 +53,7 @@ export const OrderAccuracyChart: React.FC<OrderAccuracyChartProps> = ({ orders }
       <div className="card flex flex-col justify-between">
         <div>
           <div className="flex items-center gap-2 mb-6">
-            <CheckCircle className="w-5 h-5 text-[#10b981]" />
+            <CheckCircle className="w-5 h-5 text-[#94a3b8]" />
             <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em]">Order Fulfillment Status</h3>
           </div>
 
@@ -75,12 +75,12 @@ export const OrderAccuracyChart: React.FC<OrderAccuracyChartProps> = ({ orders }
                     <XAxis
                       dataKey="label"
                       stroke="#64748b"
-                      fontSize={10}
+                      fontSize={12}
                       tickLine={false}
                     />
                     <YAxis 
                       stroke="#64748b" 
-                      fontSize={10} 
+                      fontSize={12}
                       allowDecimals={false}
                       tickLine={false}
                     />
@@ -129,7 +129,7 @@ export const OrderAccuracyChart: React.FC<OrderAccuracyChartProps> = ({ orders }
                       <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
                       <div className="flex flex-col">
                         <span className="text-xs text-[#e2e8f0] font-bold">{displayLabel}</span>
-                        <span className="text-[10px] text-[#9ca3af]">{count} order ({percentage}%)</span>
+                        <span className="text-xs text-[#9ca3af]">{count.toLocaleString('id-ID')} order ({percentage}%)</span>
                       </div>
                     </div>
                   );

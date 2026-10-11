@@ -22,7 +22,7 @@ const StockBreakdownChart: React.FC<StockBreakdownProps> = ({ data }) => {
     return (
         <div className="card h-full">
             <div className="flex items-center gap-2 mb-6">
-                <Layers className="w-5 h-5 text-[#8b5cf6]" />
+                <Layers className="w-5 h-5 text-[#94a3b8]" />
                 <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em]">Stock Breakdown by Size</h3>
             </div>
 
@@ -34,12 +34,12 @@ const StockBreakdownChart: React.FC<StockBreakdownProps> = ({ data }) => {
                         margin={{ top: 5, right: 45, left: 10, bottom: 5 }}
                     >
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" horizontal={false} />
-                        <XAxis type="number" stroke="#64748b" fontSize={11} hide />
+                        <XAxis type="number" stroke="#94a3b8" fontSize={12} hide />
                         <YAxis
                             dataKey="size"
                             type="category"
-                            stroke="#64748b"
-                            fontSize={11}
+                            stroke="#94a3b8"
+                            fontSize={12}
                             width={35}
                             axisLine={false}
                             tickLine={false}
@@ -47,7 +47,7 @@ const StockBreakdownChart: React.FC<StockBreakdownProps> = ({ data }) => {
                         <Tooltip
                             contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f1f5f9' }}
                             itemStyle={{ fontSize: '12px' }}
-                            formatter={(value: any) => [Number(value).toLocaleString(), 'Units']}
+                            formatter={(value: any) => [`${Number(value).toLocaleString('id-ID')} pcs`, 'Stok']}
                             cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
                         />
                         <Bar
@@ -62,8 +62,8 @@ const StockBreakdownChart: React.FC<StockBreakdownProps> = ({ data }) => {
                                 dataKey="stock" 
                                 position="right" 
                                 fill="#94a3b8" 
-                                fontSize={10} 
-                                formatter={(v: any) => Number(v).toLocaleString()}
+                                fontSize={12}
+                                formatter={(v: any) => `${Number(v).toLocaleString('id-ID')} pcs`}
                                 offset={8}
                             />
                         </Bar>
@@ -79,7 +79,7 @@ const StockBreakdownChart: React.FC<StockBreakdownProps> = ({ data }) => {
                             style={{ backgroundColor: COLORS[index % COLORS.length] }}
                         />
                         <span className="text-xs text-[#94a3b8] font-bold uppercase">Ukuran {item.size}</span>
-                        <span className="text-xs text-[#f1f5f9] font-extrabold ml-auto">{item.stock.toLocaleString()} Units</span>
+                        <span className="text-xs text-[#f1f5f9] font-extrabold ml-auto">{item.stock.toLocaleString('id-ID')} pcs</span>
                     </div>
                 ))}
             </div>

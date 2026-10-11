@@ -25,7 +25,7 @@ const InOutChart: React.FC<InOutChartProps> = ({ data }) => {
     return (
         <div className="card chart-full" style={{ height: '400px' }}>
             <div className="flex items-center gap-2 mb-6">
-                <ArrowUpDown className="w-5 h-5 text-[#10b981]" />
+                <ArrowUpDown className="w-5 h-5 text-[#94a3b8]" />
                 <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em]">Stock Movement (In vs Out)</h3>
             </div>
 
@@ -39,19 +39,20 @@ const InOutChart: React.FC<InOutChartProps> = ({ data }) => {
                         <XAxis
                             dataKey="date"
                             stroke="#64748b"
-                            fontSize={11}
+                            fontSize={12}
+                            minTickGap={40}
                             tickFormatter={(str) => {
                                 const date = new Date(str);
-                                return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                                return date.toLocaleDateString('id-ID', { month: 'short', day: 'numeric' });
                             }}
                         />
-                        <YAxis stroke="#64748b" fontSize={11} />
+                        <YAxis stroke="#64748b" fontSize={12} tickFormatter={(value) => Number(value).toLocaleString('id-ID')} />
                         <Tooltip
                             contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f1f5f9' }}
                             itemStyle={{ fontSize: '12px' }}
                             labelFormatter={(label) => {
                                 const date = new Date(label);
-                                return `Date: ${date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
+                                return `Tanggal: ${date.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
                             }}
                         />
                         <Legend verticalAlign="top" height={36} />

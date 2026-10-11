@@ -92,7 +92,7 @@ const StandardTooltip = ({ active, payload, label }: TooltipProps) => {
         return (
             <div className="bg-[#0f172a] border border-[#334155] p-3 rounded-lg shadow-xl">
                 <p className="text-[#f1f5f9] text-sm font-bold mb-2">
-                    {label ? new Date(label).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                    {label ? new Date(label).toLocaleDateString('id-ID', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
                 </p>
                 <div className="flex flex-col gap-1">
                     {sortedPayload.map((entry, index) => (
@@ -101,7 +101,7 @@ const StandardTooltip = ({ active, payload, label }: TooltipProps) => {
                                 {entry.name} :
                             </span>
                             <span className="text-white text-sm font-bold number-stroke">
-                                {entry.value}
+                                {Number(entry.value).toLocaleString('id-ID')} pcs
                             </span>
                         </div>
                     ))}
@@ -120,43 +120,41 @@ const ComparisonTooltip = ({ active, payload, sizes }: ComparisonTooltipProps) =
         const currentTotal = item.total ?? 0;
         const prevTotal = item.prevTotal ?? 0;
         const diff = currentTotal - prevTotal;
-        const pctChange = prevTotal > 0 
-            ? ((diff / prevTotal) * 100).toFixed(1) 
-            : (currentTotal > 0 ? '100.0' : '0.0');
+        const pctChange = prevTotal > 0 ? (diff / prevTotal) * 100 : (currentTotal > 0 ? 100 : 0);
 
         return (
             <div className="bg-[#0f172a] border border-[#334155] p-3.5 rounded-xl shadow-2xl min-w-[280px] max-w-[340px] text-xs">
                 {/* Header: Date Comparison */}
                 <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#334155]">
                     <div className="flex flex-col">
-                        <span className="text-[10px] text-[#38bdf8] uppercase font-bold tracking-wider">Periode Ini</span>
+                        <span className="text-xs text-[#38bdf8] uppercase font-bold tracking-wider">Periode Ini</span>
                         <span className="text-white font-bold text-xs">{formatFullDate(item.date)}</span>
                     </div>
                     <div className="text-center px-1.5 py-0.5 rounded bg-[#1e293b] border border-[#334155]">
-                        <span className="text-[#94a3b8] text-[10px] font-bold">vs</span>
+                        <span className="text-[#94a3b8] text-xs font-bold">vs</span>
                     </div>
                     <div className="flex flex-col text-right">
-                        <span className="text-[10px] text-amber-400 uppercase font-bold tracking-wider">1 Bulan Lalu</span>
-                        <span className="text-amber-300 font-bold text-xs">{formatFullDate(item.prevDate)}</span>
+                        <span className="text-xs text-[#94a3b8] uppercase font-bold tracking-wider">1 Bulan Lalu</span>
+                        <span className="text-[#cbd5e1] font-bold text-xs">{formatFullDate(item.prevDate)}</span>
                     </div>
                 </div>
 
                 {/* Total Comparison Box */}
                 <div className="bg-[#1e293b]/70 p-2.5 rounded-lg border border-[#334155]/60 mb-2.5 flex items-center justify-between">
                     <div>
-                        <div className="text-[10px] text-[#94a3b8] uppercase font-semibold">Total Penjualan</div>
+                        <div className="text-xs text-[#94a3b8] uppercase font-semibold">Total Penjualan</div>
                         <div className="flex items-baseline gap-2 mt-0.5">
-                            <span className="text-base font-extrabold text-[#38bdf8]">{currentTotal.toLocaleString()} pcs</span>
-                            <span className="text-xs text-amber-300/80 font-mono">({prevTotal.toLocaleString()})</span>
+                            <span className="text-base font-extrabold text-[#38bdf8]">{currentTotal.toLocaleString('id-ID')} pcs</span>
+                            <span className="text-xs text-[#cbd5e1] font-mono">({prevTotal.toLocaleString('id-ID')} pcs)</span>
                         </div>
                     </div>
                     <div className="text-right">
-                        <div className="text-[10px] text-[#94a3b8] uppercase font-semibold">Pertumbuhan</div>
+                        <div className="text-xs text-[#94a3b8] uppercase font-semibold">Pertumbuhan</div>
                         <div className={`text-xs font-extrabold mt-0.5 flex items-center justify-end gap-1 ${
                             diff > 0 ? 'text-[#10b981]' : diff < 0 ? 'text-[#ef4444]' : 'text-[#94a3b8]'
                         }`}>
                             {diff > 0 ? <TrendingUp className="w-3 h-3" /> : diff < 0 ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
-                            <span>{diff > 0 ? `+${diff}` : diff} ({diff > 0 ? `+${pctChange}%` : `${pctChange}%`})</span>
+                            <span>{diff > 0 ? `+${diff.toLocaleString('id-ID')}` : diff.toLocaleString('id-ID')} ({diff > 0 ? '+' : ''}{pctChange.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%)</span>
                         </div>
                     </div>
                 </div>
@@ -164,7 +162,7 @@ const ComparisonTooltip = ({ active, payload, sizes }: ComparisonTooltipProps) =
                 {/* Size breakdown if 'All' sizes selected */}
                 {sizes.length > 1 && (
                     <div className="space-y-1">
-                        <div className="text-[10px] uppercase font-bold text-[#64748b] tracking-wider mb-1 flex justify-between">
+                        <div className="text-xs uppercase font-bold text-[#94a3b8] tracking-wider mb-1 flex justify-between">
                             <span>Ukuran</span>
                             <span className="text-right">Bulan Ini (Bln Lalu) [Selisih]</span>
                         </div>
@@ -177,8 +175,8 @@ const ComparisonTooltip = ({ active, payload, sizes }: ComparisonTooltipProps) =
                                     <span className="font-bold text-[#cbd5e1]">{s}</span>
                                     <div className="flex items-center gap-2">
                                         <span className="text-[#38bdf8] font-mono font-semibold">{cur}</span>
-                                        <span className="text-[#64748b] text-[10px] font-mono">({prev})</span>
-                                        <span className={`text-[11px] font-mono font-bold w-12 text-right ${
+                                        <span className="text-[#94a3b8] text-xs font-mono">({prev})</span>
+                                        <span className={`text-xs font-mono font-bold w-12 text-right ${
                                             sDiff > 0 ? 'text-[#10b981]' : sDiff < 0 ? 'text-[#ef4444]' : 'text-[#64748b]'
                                         }`}>
                                             {sDiff > 0 ? `+${sDiff}` : sDiff}
@@ -286,8 +284,8 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                                 <h3 className="text-white text-sm font-bold uppercase tracking-wider">
                                     Perbandingan Penjualan MoM (Day-to-Day)
                                 </h3>
-                                <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                <span className="px-2 py-0.5 rounded text-xs font-extrabold uppercase bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30 flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span>
                                     Bulan Ini vs 1 Bulan Lalu
                                 </span>
                             </div>
@@ -318,12 +316,12 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                         }}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 border ${
                             isComparing
-                                ? 'bg-gradient-to-r from-amber-500/25 to-amber-600/20 border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                                ? 'bg-[#10b981]/15 border-[#10b981]/50 text-[#10b981]'
                                 : 'bg-[#1e293b] border-[#334155] text-[#94a3b8] hover:text-[#f1f5f9] hover:border-[#475569]'
                         }`}
                         title="Bandingkan penjualan periode ini dengan 1 bulan yang lalu secara day-to-day"
                     >
-                        <ArrowLeftRight className={`w-3.5 h-3.5 ${isComparing ? 'text-amber-400' : 'text-[#94a3b8]'}`} />
+                        <ArrowLeftRight className={`w-3.5 h-3.5 ${isComparing ? 'text-[#10b981]' : 'text-[#94a3b8]'}`} />
                         <span>{isComparing ? 'Bandingkan: Aktif' : 'vs 1 Bulan Lalu'}</span>
                     </button>
 
@@ -351,37 +349,37 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                     {/* 1. Bulan Ini Total */}
                     <div className="flex flex-col gap-1 p-2.5 rounded-lg bg-[#1e293b]/60 border border-[#334155]/40">
                         <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-[#38bdf8] uppercase font-bold tracking-wider">Total Bulan Ini</span>
+                            <span className="text-xs text-[#38bdf8] uppercase font-bold tracking-wider">Total Bulan Ini</span>
                             <span className="w-2 h-2 rounded-full bg-[#38bdf8]"></span>
                         </div>
                         <div className="text-xl font-extrabold text-white">
-                            {summaryStats.currentTotal.toLocaleString()}{' '}
+                            {summaryStats.currentTotal.toLocaleString('id-ID')}{' '}
                             <span className="text-xs font-normal text-[#94a3b8]">pcs</span>
                         </div>
-                        <span className="text-[11px] text-[#94a3b8]">
-                            Rata-rata: <strong className="text-white">{summaryStats.currentDailyAvg.toFixed(1)}</strong> / hari
+                        <span className="text-xs text-[#94a3b8]">
+                            Rata-rata: <strong className="text-white">{summaryStats.currentDailyAvg.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</strong> pcs/hari
                         </span>
                     </div>
 
                     {/* 2. 1 Bulan Lalu Total */}
                     <div className="flex flex-col gap-1 p-2.5 rounded-lg bg-[#1e293b]/60 border border-[#334155]/40">
                         <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-amber-400 uppercase font-bold tracking-wider">Total 1 Bulan Lalu</span>
-                            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                            <span className="text-xs text-[#94a3b8] uppercase font-bold tracking-wider">Total 1 Bulan Lalu</span>
+                            <span className="w-2 h-2 rounded-full bg-[#94a3b8]"></span>
                         </div>
-                        <div className="text-xl font-extrabold text-amber-300">
-                            {summaryStats.prevTotal.toLocaleString()}{' '}
-                            <span className="text-xs font-normal text-amber-300/70">pcs</span>
+                        <div className="text-xl font-extrabold text-[#cbd5e1]">
+                            {summaryStats.prevTotal.toLocaleString('id-ID')}{' '}
+                            <span className="text-xs font-normal text-[#94a3b8]">pcs</span>
                         </div>
-                        <span className="text-[11px] text-[#94a3b8]">
-                            Rata-rata: <strong className="text-amber-200">{summaryStats.prevDailyAvg.toFixed(1)}</strong> / hari
+                        <span className="text-xs text-[#94a3b8]">
+                            Rata-rata: <strong className="text-[#cbd5e1]">{summaryStats.prevDailyAvg.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</strong> pcs/hari
                         </span>
                     </div>
 
                     {/* 3. Pertumbuhan (MoM) */}
                     <div className="flex flex-col gap-1 p-2.5 rounded-lg bg-[#1e293b]/60 border border-[#334155]/40">
                         <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-[#94a3b8] uppercase font-bold tracking-wider">Pertumbuhan (MoM)</span>
+                            <span className="text-xs text-[#94a3b8] uppercase font-bold tracking-wider">Pertumbuhan (MoM)</span>
                             {summaryStats.diff >= 0 ? (
                                 <TrendingUp className="w-3.5 h-3.5 text-[#10b981]" />
                             ) : (
@@ -389,19 +387,19 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                             )}
                         </div>
                         <div className={`text-xl font-extrabold ${summaryStats.diff >= 0 ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
-                            {summaryStats.diff >= 0 ? `+${summaryStats.diff.toLocaleString()}` : summaryStats.diff.toLocaleString()}{' '}
+                            {summaryStats.diff >= 0 ? `+${summaryStats.diff.toLocaleString('id-ID')}` : summaryStats.diff.toLocaleString('id-ID')}{' '}
                             <span className="text-xs font-normal">pcs</span>
                         </div>
-                        <span className={`text-[11px] font-bold ${summaryStats.diff >= 0 ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
-                            {summaryStats.diff >= 0 ? `+${summaryStats.pctChange.toFixed(1)}%` : `${summaryStats.pctChange.toFixed(1)}%`} vs bln lalu
+                        <span className={`text-xs font-bold ${summaryStats.diff >= 0 ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
+                            {summaryStats.diff >= 0 ? '+' : ''}{summaryStats.pctChange.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% vs bln lalu
                         </span>
                     </div>
 
                     {/* 4. Konsistensi Harian */}
                     <div className="flex flex-col gap-1 p-2.5 rounded-lg bg-[#1e293b]/60 border border-[#334155]/40">
                         <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-[#94a3b8] uppercase font-bold tracking-wider">Performa Harian</span>
-                            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                            <span className="text-xs text-[#94a3b8] uppercase font-bold tracking-wider">Performa Harian</span>
+                            <Sparkles className="w-3.5 h-3.5 text-[#94a3b8]" />
                         </div>
                         <div className="text-xl font-extrabold text-white">
                             {summaryStats.betterDays}{' '}
@@ -414,19 +412,19 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                                     style={{ width: `${summaryStats.winRate}%` }}
                                 ></div>
                             </div>
-                            <span className="text-[10px] font-bold text-[#10b981] whitespace-nowrap">{summaryStats.winRate}%</span>
+                            <span className="text-xs font-bold text-[#10b981] whitespace-nowrap">{summaryStats.winRate}%</span>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Sub-controls when comparing (display mode switch & table drawer trigger) */}
-            {isComparing && (
+            {/* Keep aggregate totals separate from the per-size lines. */}
+            {(isComparing || sizes.length > 1) && (
                 <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                         {sizes.length > 1 && (
                             <div className="flex items-center gap-1.5 text-xs">
-                                <span className="text-[#64748b] font-medium text-[11px]">Tampilan Garis:</span>
+                                <span className="text-[#94a3b8] font-medium text-xs">Tampilan Garis:</span>
                                 <div className="segmented-control">
                                     <button
                                         onClick={() => setDisplayMode('total')}
@@ -438,22 +436,22 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                                         onClick={() => setDisplayMode('breakdown')}
                                         className={`segmented-button ${displayMode === 'breakdown' ? 'active' : ''}`}
                                     >
-                                        + Rincian Ukuran
+                                        Per Ukuran
                                     </button>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    <button
+                    {isComparing && <button
                         type="button"
                         onClick={() => setShowDayToDayTable(!showDayToDayTable)}
                         className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 bg-[#1e293b] hover:bg-[#334155] border border-[#334155] rounded-lg text-[#94a3b8] hover:text-[#f8fafc] transition-all ml-auto"
                     >
-                        <TableIcon className="w-3.5 h-3.5 text-amber-400" />
+                        <TableIcon className="w-3.5 h-3.5 text-[#94a3b8]" />
                         <span>{showDayToDayTable ? 'Tutup Tabel Day-to-Day' : 'Lihat Tabel Day-to-Day'}</span>
                         {showDayToDayTable ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                    </button>
+                    </button>}
                 </div>
             )}
 
@@ -465,10 +463,12 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                         <XAxis
                             dataKey="date"
                             stroke="#64748b"
-                            fontSize={11}
+                            fontSize={12}
+                            minTickGap={40}
+                            interval={Math.max(0, Math.ceil(data.length / 9) - 1)}
                             tickFormatter={(str) => formatShortDate(str)}
                         />
-                        <YAxis stroke="#64748b" fontSize={11} />
+                        <YAxis stroke="#64748b" fontSize={12} tickFormatter={(value) => Number(value).toLocaleString('id-ID')} />
                         <Tooltip
                             content={
                                 isComparing ? (
@@ -489,7 +489,7 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                                     value: `Min Stock: ${minStock}`,
                                     position: 'right',
                                     fill: '#ef4444',
-                                    fontSize: 10,
+                                    fontSize: 12,
                                     fontWeight: 'bold'
                                 }}
                             />
@@ -499,31 +499,31 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                         {isComparing ? (
                             <>
                                 {/* 1. Primary Line: Total Bulan Ini */}
-                                <Line
+                                {(displayMode === 'total' || sizes.length === 1) && <Line
                                     type="monotone"
                                     dataKey="total"
                                     name={sizes.length === 1 ? `${sizes[0]} (Bulan Ini)` : "Total Sales (Bulan Ini)"}
                                     stroke="#38bdf8"
                                     strokeWidth={3}
-                                    dot={{ r: 4, fill: '#38bdf8', stroke: '#0f172a', strokeWidth: 1.5 }}
-                                    activeDot={{ r: 7, fill: '#38bdf8' }}
+                                    dot={false}
+                                    activeDot={{ r: 4 }}
                                     connectNulls={true}
                                     hide={!!hiddenSizes['total']}
-                                />
+                                />}
 
                                 {/* 2. Comparison Benchmark Line: 1 Bulan Lalu */}
-                                <Line
+                                {(displayMode === 'total' || sizes.length === 1) && <Line
                                     type="monotone"
                                     dataKey="prevTotal"
                                     name={sizes.length === 1 ? `${sizes[0]} (1 Bulan Lalu)` : "Total Sales (1 Bulan Lalu)"}
                                     stroke="#f59e0b"
                                     strokeWidth={2.5}
                                     strokeDasharray="5 5"
-                                    dot={{ r: 4, fill: '#f59e0b', stroke: '#0f172a', strokeWidth: 1.5 }}
-                                    activeDot={{ r: 7, fill: '#f59e0b' }}
+                                    dot={false}
+                                    activeDot={{ r: 4 }}
                                     connectNulls={true}
                                     hide={!!hiddenSizes['prevTotal']}
-                                />
+                                />}
 
                                 {/* 3. Breakdown size lines if requested */}
                                 {sizes.length > 1 && displayMode === 'breakdown' && (
@@ -536,8 +536,8 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                                                 name={`${size} (Bulan Ini)`}
                                                 stroke={colors[index % colors.length]}
                                                 strokeWidth={2}
-                                                dot={{ r: 3, fill: colors[index % colors.length] }}
-                                                activeDot={{ r: 5 }}
+                                                dot={false}
+                                                activeDot={{ r: 4 }}
                                                 connectNulls={false}
                                                 hide={!!hiddenSizes[size]}
                                             />
@@ -551,8 +551,8 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                                                 stroke={colors[index % colors.length]}
                                                 strokeWidth={1.5}
                                                 strokeDasharray="3 3"
-                                                dot={{ r: 3, fill: colors[index % colors.length] }}
-                                                activeDot={{ r: 5 }}
+                                                dot={false}
+                                                activeDot={{ r: 4 }}
                                                 opacity={0.7}
                                                 connectNulls={false}
                                                 hide={!!hiddenSizes[`prev_${size}`]}
@@ -564,20 +564,20 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                         ) : (
                             /* Standard Mode Rendering */
                             <>
-                                {sizes.map((size, index) => (
+                                {(displayMode === 'breakdown' || sizes.length === 1) && sizes.map((size, index) => (
                                     <Line
                                         key={size}
                                         type="monotone"
                                         dataKey={size}
                                         stroke={colors[index % colors.length]}
                                         strokeWidth={2}
-                                        dot={{ r: 4, fill: colors[index % colors.length] }}
-                                        activeDot={{ r: 6 }}
+                                        dot={false}
+                                        activeDot={{ r: 4 }}
                                         connectNulls={false}
                                         hide={!!hiddenSizes[size]}
                                     />
                                 ))}
-                                {data.length > 0 && 'total' in data[0] && sizes.length > 1 && (
+                                {displayMode === 'total' && data.length > 0 && 'total' in data[0] && sizes.length > 1 && (
                                     <Line
                                         type="monotone"
                                         dataKey="total"
@@ -585,8 +585,8 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                                         stroke="var(--text-primary)"
                                         strokeWidth={3}
                                         strokeDasharray="5 5"
-                                        dot={{ r: 5, fill: 'var(--text-primary)' }}
-                                        activeDot={{ r: 8 }}
+                                        dot={false}
+                                        activeDot={{ r: 4 }}
                                         connectNulls={true}
                                         opacity={0.8}
                                         hide={!!hiddenSizes['total']}
@@ -603,7 +603,7 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                 <div className="mt-4 pt-4 border-t border-[#334155] flex justify-between items-center transition-all duration-300">
                     <span className="text-[#94a3b8] text-xs font-bold uppercase tracking-wider">Total {metric} for Period</span>
                     <span className="text-xl font-bold number-stroke">
-                        {totalAggregate.toLocaleString()}
+                        {totalAggregate.toLocaleString('id-ID')} pcs
                     </span>
                 </div>
             )}
@@ -613,7 +613,7 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                 <div className="mt-4 pt-4 border-t border-[#334155]/60 animate-in fade-in duration-200">
                     <div className="flex justify-between items-center mb-3">
                         <div className="flex items-center gap-2">
-                            <TableIcon className="w-4 h-4 text-amber-400" />
+                            <TableIcon className="w-4 h-4 text-[#94a3b8]" />
                             <h4 className="text-xs font-bold uppercase tracking-wider text-[#f1f5f9]">
                                 Rincian Penjualan Harian (Day-to-Day)
                             </h4>
@@ -639,9 +639,7 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                                     const cur = row.total ?? 0;
                                     const prev = row.prevTotal ?? 0;
                                     const diff = cur - prev;
-                                    const pct = prev > 0 
-                                        ? ((diff / prev) * 100).toFixed(1) 
-                                        : (cur > 0 ? '100.0' : '0.0');
+                                    const pct = prev > 0 ? (diff / prev) * 100 : (cur > 0 ? 100 : 0);
 
                                     return (
                                         <tr key={idx} className="hover:bg-[#1e293b]/60 transition-colors">
@@ -652,32 +650,32 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                                                 {formatFullDate(row.prevDate)}
                                             </td>
                                             <td className="py-2 px-3 text-right font-mono font-bold text-[#38bdf8]">
-                                                {cur.toLocaleString()}
+                                                {cur.toLocaleString('id-ID')}
                                             </td>
                                             <td className="py-2 px-3 text-right font-mono text-amber-300">
-                                                {prev.toLocaleString()}
+                                                {prev.toLocaleString('id-ID')}
                                             </td>
                                             <td className={`py-2 px-3 text-right font-mono font-bold ${
                                                 diff > 0 ? 'text-[#10b981]' : diff < 0 ? 'text-[#ef4444]' : 'text-[#64748b]'
                                             }`}>
-                                                {diff > 0 ? `+${diff.toLocaleString()}` : diff.toLocaleString()}
+                                                {diff > 0 ? `+${diff.toLocaleString('id-ID')}` : diff.toLocaleString('id-ID')}
                                             </td>
                                             <td className={`py-2 px-3 text-right font-mono ${
                                                 diff > 0 ? 'text-[#10b981]' : diff < 0 ? 'text-[#ef4444]' : 'text-[#64748b]'
                                             }`}>
-                                                {diff > 0 ? `+${pct}%` : `${pct}%`}
+                                                {diff > 0 ? '+' : ''}{pct.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
                                             </td>
                                             <td className="py-2 px-3 text-center">
                                                 {diff > 0 ? (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30">
                                                         <TrendingUp className="w-2.5 h-2.5" /> Naik
                                                     </span>
                                                 ) : diff < 0 ? (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ef4444]/15 text-[#ef4444] border border-[#ef4444]/30">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-[#ef4444]/15 text-[#ef4444] border border-[#ef4444]/30">
                                                         <TrendingDown className="w-2.5 h-2.5" /> Turun
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#64748b]/15 text-[#94a3b8] border border-[#64748b]/30">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-[#64748b]/15 text-[#94a3b8] border border-[#64748b]/30">
                                                         <Minus className="w-2.5 h-2.5" /> Sama
                                                     </span>
                                                 )}
@@ -692,23 +690,23 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                                         <td className="py-2.5 px-3 uppercase tracking-wider text-xs">Total Periode</td>
                                         <td className="py-2.5 px-3 text-[#94a3b8]">-</td>
                                         <td className="py-2.5 px-3 text-right font-mono text-[#38bdf8] text-sm">
-                                            {summaryStats.currentTotal.toLocaleString()}
+                                            {summaryStats.currentTotal.toLocaleString('id-ID')}
                                         </td>
                                         <td className="py-2.5 px-3 text-right font-mono text-amber-300 text-sm">
-                                            {summaryStats.prevTotal.toLocaleString()}
+                                            {summaryStats.prevTotal.toLocaleString('id-ID')}
                                         </td>
                                         <td className={`py-2.5 px-3 text-right font-mono text-sm ${
                                             summaryStats.diff > 0 ? 'text-[#10b981]' : summaryStats.diff < 0 ? 'text-[#ef4444]' : 'text-[#64748b]'
                                         }`}>
-                                            {summaryStats.diff > 0 ? `+${summaryStats.diff.toLocaleString()}` : summaryStats.diff.toLocaleString()}
+                                            {summaryStats.diff > 0 ? `+${summaryStats.diff.toLocaleString('id-ID')}` : summaryStats.diff.toLocaleString('id-ID')}
                                         </td>
                                         <td className={`py-2.5 px-3 text-right font-mono text-sm ${
                                             summaryStats.diff > 0 ? 'text-[#10b981]' : summaryStats.diff < 0 ? 'text-[#ef4444]' : 'text-[#64748b]'
                                         }`}>
-                                            {summaryStats.diff > 0 ? `+${summaryStats.pctChange.toFixed(1)}%` : `${summaryStats.pctChange.toFixed(1)}%`}
+                                            {summaryStats.diff > 0 ? '+' : ''}{summaryStats.pctChange.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
                                         </td>
                                         <td className="py-2.5 px-3 text-center">
-                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${
                                                 summaryStats.diff >= 0 ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#ef4444]/20 text-[#ef4444]'
                                             }`}>
                                                 {summaryStats.diff >= 0 ? '🟢 Naik' : '🔴 Turun'}

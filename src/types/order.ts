@@ -1,7 +1,8 @@
 export type OrderStatus = 'In Production' | 'Completed' | 'Shortage' | 'Excess';
 
 export interface OrderRecord {
-  dateOrder: string;      // YYYY-MM-DD
+  sourceRow?: number;     // Original row number in the Order sheet
+  dateOrder: string;      // YYYY-MM-DD; empty when missing or invalid, never inferred
   konveksi: string;       // Workshop name (e.g. Anton, Juju)
   brand: string;          // "Rucas" or "Marapthon"
   item: string;           // Product item (e.g. "Special Grey S")

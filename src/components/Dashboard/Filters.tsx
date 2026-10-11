@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Size } from '../../types/inventory';
+import { formatFullDate } from '../../utils/dateUtils';
 
 interface FiltersProps {
     products: string[];
@@ -27,10 +28,11 @@ const Filters: React.FC<FiltersProps> = ({
     onEndDateChange,
 }) => {
     return (
-        <div className="card filter-grid mb-8 border-b border-[#334155]/60 pb-6">
+        <div className="dashboard-filters">
             <div className="flex flex-col gap-2">
                 <label className="text-[#94a3b8] text-[0.8rem] font-bold uppercase tracking-wider">Product</label>
                 <select
+                    aria-label="Produk"
                     className="btn bg-[#0f172a] border border-[#334155] text-[#f1f5f9] focus:outline-none focus:border-[#3b82f6] px-3 py-2 text-xs w-full"
                     value={selectedProduct}
                     onChange={(e) => onProductChange(e.target.value)}
@@ -44,6 +46,7 @@ const Filters: React.FC<FiltersProps> = ({
                 <label className="text-[#94a3b8] text-[0.8rem] font-bold uppercase tracking-wider">Size</label>
                 <select
                     className="btn bg-[#0f172a] border border-[#334155] text-[#f1f5f9] focus:outline-none focus:border-[#3b82f6] px-3 py-2 text-xs w-full"
+                    aria-label="Ukuran"
                     value={selectedSize}
                     onChange={(e) => onSizeChange(e.target.value as Size | 'All')}
                 >
@@ -57,9 +60,10 @@ const Filters: React.FC<FiltersProps> = ({
             </div>
 
             <div className="flex flex-col gap-2">
-                <label className="text-[#94a3b8] text-[0.8rem] font-bold uppercase tracking-wider">Start Date</label>
+                <label className="text-[#94a3b8] text-[0.8rem] font-bold uppercase tracking-wider">Mulai · {formatFullDate(startDate)}</label>
                 <input
                     type="date"
+                    aria-label="Tanggal mulai"
                     className="btn bg-[#0f172a] border border-[#334155] text-[#f1f5f9] focus:outline-none focus:border-[#3b82f6] px-3 py-2 text-xs w-full"
                     min={dateRange.min}
                     max={dateRange.max}
@@ -69,12 +73,13 @@ const Filters: React.FC<FiltersProps> = ({
             </div>
 
             <div className="flex flex-col gap-2">
-                <label className="text-[#94a3b8] text-[0.8rem] font-bold uppercase tracking-wider">End Date</label>
+                <label className="text-[#94a3b8] text-[0.8rem] font-bold uppercase tracking-wider">Selesai · {formatFullDate(endDate)}</label>
                 <input
                     type="date"
                     className="btn bg-[#0f172a] border border-[#334155] text-[#f1f5f9] focus:outline-none focus:border-[#3b82f6] px-3 py-2 text-xs w-full"
                     min={dateRange.min}
                     max={dateRange.max}
+                    aria-label="Tanggal akhir"
                     value={endDate}
                     onChange={(e) => onEndDateChange(e.target.value)}
                 />
