@@ -53,3 +53,14 @@ export function formatFullDate(dateStr?: string): string {
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+/**
+ * Returns today's date in local time as YYYY-MM-DD
+ */
+export function getTodayDateStr(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}

@@ -27,6 +27,7 @@ import {
 import { ExpenseTrendChart } from '../Charts/ExpenseTrendChart';
 import { ExpenseCategoryChart } from '../Charts/ExpenseCategoryChart';
 import { ExpenseTopVendorsChart } from '../Charts/ExpenseTopVendorsChart';
+import { getOneMonthAgoDate, getTodayDateStr } from '../../utils/dateUtils';
 
 interface ExpenseTrackerProps {
   expenses: ExpenseRecord[];
@@ -61,13 +62,20 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // Initialize dates from dateRange
+  // Initialize dates from dateRange: default 1 month back from TODAY
   useEffect(() => {
-    if (dateRange.min && !startDate) {
-      setStartDate(dateRange.min);
-    }
-    if (dateRange.max && !endDate) {
-      setEndDate(dateRange.max);
+    if (dateRange.min) {
+      const todayStr = getTodayDateStr();
+      const defaultEnd = dateRange.max && dateRange.max < todayStr ? dateRange.max : todayStr;
+      const oneMonthAgo = getOneMonthAgoDate(defaultEnd);
+      const initialStart = dateRange.min && oneMonthAgo < dateRange.min ? dateRange.min : oneMonthAgo;
+
+      if (!endDate) {
+        setEndDate(defaultEnd);
+      }
+      if (!startDate) {
+        setStartDate(initialStart);
+      }
     }
   }, [dateRange]);
 

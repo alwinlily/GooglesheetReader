@@ -342,6 +342,12 @@ body {
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
+.status-badge-ordered {
+  background-color: rgba(2, 132, 199, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
 .status-badge-hold {
   background-color: rgba(59, 130, 246, 0.15);
   color: #60a5fa;
@@ -447,6 +453,13 @@ body {
 .filter-tab.active-soon {
   background: #f59e0b;
   color: #0f172a;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.filter-tab.active-ordered {
+  background: #0284c7;
+  color: white;
   font-weight: 700;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }

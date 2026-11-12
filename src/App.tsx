@@ -16,7 +16,7 @@ import { PinModal } from './components/Dashboard/PinModal';
 import type { Size } from './types/inventory';
 import { calculateInventoryMismatches } from './utils/inventoryValidation';
 import { summarizeInventory } from './utils/inventoryStats';
-import { getOneMonthAgoDate } from './utils/dateUtils';
+import { getOneMonthAgoDate, getTodayDateStr } from './utils/dateUtils';
 import { AlertOctagon, Lock } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -104,11 +104,16 @@ function App() {
     setActivePage('inventory');
   };
 
-  // Set default dates once data is loaded
+  // Set default dates once data is loaded: by default always display 1 month back from TODAY
   React.useEffect(() => {
     if (dateRange.min) {
-      setStartDate(dateRange.min);
-      setEndDate(dateRange.max);
+      const todayStr = getTodayDateStr();
+      const defaultEnd = dateRange.max && dateRange.max < todayStr ? dateRange.max : todayStr;
+      const oneMonthAgo = getOneMonthAgoDate(defaultEnd);
+      const defaultStart = dateRange.min && oneMonthAgo < dateRange.min ? dateRange.min : oneMonthAgo;
+
+      setStartDate(defaultStart);
+      setEndDate(defaultEnd);
     }
   }, [dateRange]);
 
@@ -150,7 +155,7 @@ function App() {
   const trendData = useMemo(() => {
     // Group by date
     const dateGroups: Record<string, any> = {};
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getTodayDateStr();
 
     filteredData.forEach(r => {
       if (r.date > todayStr) return; // Cap at today
@@ -448,7 +453,8 @@ function App() {
     });
 
     // 2. Current stock
-    const latestDate = dateRange.max;
+    const datesInFiltered = filteredData.map(r => r.date).sort();
+    const latestDate = datesInFiltered.length > 0 ? datesInFiltered[datesInFiltered.length - 1] : dateRange.max;
     const currentStock = filteredData
       .filter(r => r.date === latestDate)
       .reduce((sum, r) => sum + (r.stock || 0), 0);
@@ -596,7 +602,13 @@ function App() {
             onEndDateChange={setEndDate}
           />
 
-          <ReplenishmentPlanner data={scopedData} productMetadata={productMetadata} startDate={startDate} endDate={endDate}>
+          <ReplenishmentPlanner 
+            data={scopedData} 
+            productMetadata={productMetadata} 
+            orders={orderData}
+            startDate={startDate} 
+            endDate={endDate}
+          >
             <SummaryCards {...stats} previous={previousStats} />
             <StockTrendChart
               data={trendData}

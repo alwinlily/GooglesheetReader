@@ -1,18 +1,22 @@
 import React, { useState, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { Search, TriangleAlert, CirclePause, Calendar, CircleArrowDown, Info, TrendingDown } from 'lucide-react';
+import { Search, TriangleAlert, CirclePause, Calendar, CircleArrowDown, Info, TrendingDown, Package } from 'lucide-react';
 import type { InventoryRecord, Size } from '../../types/inventory';
 import type { ProductMetadata } from '../../hooks/useInventoryData';
+import type { OrderRecord } from '../../types/order';
+import { findActiveOrderForProduct } from '../../utils/productMatching';
+import { formatFullDate } from '../../utils/dateUtils';
 
 interface ReplenishmentPlannerProps {
     data: InventoryRecord[];
     productMetadata: Record<string, Record<string, ProductMetadata>>;
+    orders?: OrderRecord[];
     startDate?: string;
     endDate?: string;
     children?: ReactNode;
 }
 
-type ReplenishmentStatus = 'Out of Stock' | 'Order Soon' | 'Hold Order' | 'Stable';
+export type ReplenishmentStatus = 'Out of Stock' | 'Order Soon' | 'On Order' | 'Hold Order' | 'Stable';
 
 interface PlannerItem {
     product: string;
@@ -28,9 +32,13 @@ interface PlannerItem {
     stockoutDateStr: string | null;
     suggestion: string;
     suggestedOrderQty: number;
+    isOnOrder: boolean;
+    orderedQty: number;
+    latestOrderDate: string | null;
+    latestVendor: string | null;
 }
 
-const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, startDate, endDate, children }) => {
+const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, orders = [], startDate, endDate, children }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'All' | ReplenishmentStatus>('All');
     const [sortBy, setSortBy] = useState<'product' | 'size' | 'currentStock' | 'velocity' | 'restockInterval' | 'minStock' | 'daysToStockOut' | 'status'>('daysToStockOut');
@@ -141,9 +149,15 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, start
             // 6. Calculate days to stockout
             const daysToStockOut = velocity > 0 ? (currentStock / velocity) : Infinity;
 
-            // 7. Determine status based on days to stockout (60 days = 2 months threshold)
+            // 7. Check if item has already been ordered in Order Tracker (Status: In Production)
+            const activeOrderInfo = findActiveOrderForProduct(product, size, orders);
+            const { isOnOrder, totalOrderedQty: orderedQty, latestOrderDate, latestVendor } = activeOrderInfo;
+
+            // 8. Determine status based on active order or days to stockout (60 days = 2 months threshold)
             let status: ReplenishmentStatus = 'Stable';
-            if (currentStock <= 0) {
+            if (isOnOrder) {
+                status = 'On Order';
+            } else if (currentStock <= 0) {
                 status = 'Out of Stock';
             } else if (velocity === 0) {
                 status = 'Stable';
@@ -153,7 +167,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, start
                 status = 'Hold Order';
             }
 
-            // 8. Calculate reorder time and suggestion messages
+            // 9. Calculate reorder time and suggestion messages
             let daysToReorder = 0;
             let reorderDateStr: string | null = null;
             let stockoutDateStr: string | null = null;
@@ -166,7 +180,11 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, start
                 return targetDate.toLocaleDateString('id-ID', { month: 'short', day: 'numeric', year: 'numeric' });
             };
 
-            if (status === 'Out of Stock') {
+            if (status === 'On Order') {
+                const vendorPart = latestVendor ? ` ke vendor ${latestVendor}` : '';
+                const datePart = latestOrderDate ? ` pada tanggal ${formatFullDate(latestOrderDate)}` : '';
+                suggestion = `Barang sudah diorder sebanyak ${orderedQty.toLocaleString('id-ID')} pcs di Order Tracker (Status: Dalam Produksi)${vendorPart}${datePart}. Stok saat ini: ${currentStock.toLocaleString('id-ID')} unit (Batas aman: ${minStock.toLocaleString('id-ID')} unit).`;
+            } else if (status === 'Out of Stock') {
                 suggestion = `Stok habis! Disarankan order ${suggestedOrderQty} unit hari ini untuk mengamankan stok 60 hari.`;
             } else if (status === 'Stable') {
                 suggestion = 'Aman. Laju penjualan 0, tidak diperlukan pemesanan baru.';
@@ -206,12 +224,16 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, start
                 reorderDateStr,
                 stockoutDateStr,
                 suggestion,
-                suggestedOrderQty
+                suggestedOrderQty,
+                isOnOrder,
+                orderedQty,
+                latestOrderDate,
+                latestVendor
             });
         });
 
         return items;
-    }, [data, startDate, endDate]);
+    }, [data, startDate, endDate, orders]);
 
     // Summary counts
     const summary = useMemo(() => {
@@ -219,6 +241,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, start
             total: 0,
             outOfStock: 0,
             orderSoon: 0,
+            onOrder: 0,
             holdOrder: 0,
             stable: 0
         };
@@ -227,6 +250,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, start
             counts.total++;
             if (item.status === 'Out of Stock') counts.outOfStock++;
             else if (item.status === 'Order Soon') counts.orderSoon++;
+            else if (item.status === 'On Order') counts.onOrder++;
             else if (item.status === 'Hold Order') counts.holdOrder++;
             else if (item.status === 'Stable') counts.stable++;
         });
@@ -246,6 +270,14 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, start
 
     // Filter and Sort items
     const filteredItems = useMemo(() => {
+        const statusPriority: Record<ReplenishmentStatus, number> = {
+            'Out of Stock': 1,
+            'Order Soon': 2,
+            'On Order': 3,
+            'Hold Order': 4,
+            'Stable': 5,
+        };
+
         return plannerItems
             .filter(item => {
                 const matchesSearch = item.product.toLowerCase().includes(searchTerm.toLowerCase());
@@ -258,7 +290,10 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, start
                 let valA: string | number = a[sortBy];
                 let valB: string | number = b[sortBy];
 
-                if (sortBy === 'currentStock') {
+                if (sortBy === 'status') {
+                    valA = statusPriority[a.status] ?? 99;
+                    valB = statusPriority[b.status] ?? 99;
+                } else if (sortBy === 'currentStock') {
                     valA = a.currentStock;
                     valB = b.currentStock;
                 } else if (sortBy === 'daysToStockOut') {
@@ -288,8 +323,18 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, start
 
     if (currentPage > totalPages) setCurrentPage(totalPages);
 
-    const getStatusBadge = (status: ReplenishmentStatus) => {
-        switch (status) {
+    const getStatusBadge = (item: PlannerItem) => {
+        switch (item.status) {
+            case 'On Order':
+                return (
+                    <span 
+                        className="status-badge status-badge-ordered" 
+                        data-tooltip={`Barang sudah diorder (${item.orderedQty.toLocaleString('id-ID')} pcs) di Order Tracker. Status: Dalam Produksi.`}
+                    >
+                        <Package className="w-3.5 h-3.5 flex-shrink-0" />
+                        Sudah Diorder
+                    </span>
+                );
             case 'Out of Stock':
                 return (
                     <span className="status-badge status-badge-out" data-tooltip="Stok produk kosong. Segera buat pemesanan untuk menghindari hilangnya potensi penjualan.">
@@ -336,6 +381,20 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, start
                     <TriangleAlert className="w-4 h-4 text-[#f59e0b]" />
                     <span className="text-xs text-[#cbd5e1] font-bold">Order Segera</span>
                     <span className="text-sm text-[#fbbf24] font-extrabold font-numeric">{summary.orderSoon}</span>
+                </button>
+
+                <button type="button"
+                    onClick={() => setStatusFilter('On Order')}
+                    aria-pressed={statusFilter === 'On Order'}
+                    className={`min-h-10 px-3 py-2 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 ${
+                        statusFilter === 'On Order'
+                        ? 'bg-[#0284c7]/20 border-[#38bdf8]'
+                        : 'bg-[#1e293b] border-[#334155] hover:border-[#38bdf8]/50'
+                    }`}
+                >
+                    <Package className="w-4 h-4 text-[#38bdf8]" />
+                    <span className="text-xs text-[#cbd5e1] font-bold">Sudah Diorder</span>
+                    <span className="text-sm text-[#38bdf8] font-extrabold font-numeric">{summary.onOrder}</span>
                 </button>
 
                 <button type="button"
@@ -437,6 +496,12 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, start
                         className={`filter-tab ${statusFilter === 'Order Soon' ? 'active-soon' : ''}`}
                     >
                         Order Segera
+                    </button>
+                    <button 
+                        onClick={() => setStatusFilter('On Order')}
+                        className={`filter-tab ${statusFilter === 'On Order' ? 'active-ordered' : ''}`}
+                    >
+                        Sudah Diorder
                     </button>
                     <button 
                         onClick={() => setStatusFilter('Hold Order')}
@@ -541,14 +606,28 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, start
                                     </td>
                                     <td className="py-4.5 px-4 text-center col-status">
                                         <div className="flex justify-center">
-                                            {getStatusBadge(item.status)}
+                                            {getStatusBadge(item)}
                                         </div>
                                     </td>
                                     <td className="py-4.5 px-4 text-right text-[#cbd5e1] font-semibold whitespace-nowrap">
-                                        {item.suggestedOrderQty.toLocaleString('id-ID')} pcs
+                                        {item.status === 'On Order' ? (
+                                            <div className="flex flex-col items-end">
+                                                <span className="font-bold text-[#38bdf8] font-numeric">
+                                                    {item.orderedQty.toLocaleString('id-ID')} pcs
+                                                </span>
+                                                <span className="text-[10px] text-[#94a3b8] font-medium">dipesan</span>
+                                            </div>
+                                        ) : (
+                                            `${item.suggestedOrderQty.toLocaleString('id-ID')} pcs`
+                                        )}
                                     </td>
                                     <td className="py-4.5 px-4 text-left text-[#cbd5e1] whitespace-nowrap">
-                                        {item.status === 'Out of Stock' || (item.status === 'Order Soon' && item.daysToReorder === 0)
+                                        {item.status === 'On Order' ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium text-[#38bdf8] bg-[#0284c7]/10 border border-[#38bdf8]/20">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] animate-pulse"></span>
+                                                Dalam Produksi
+                                            </span>
+                                        ) : item.status === 'Out of Stock' || (item.status === 'Order Soon' && item.daysToReorder === 0)
                                             ? 'Hari ini'
                                             : item.reorderDateStr ?? '—'}
                                     </td>
