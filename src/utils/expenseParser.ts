@@ -12,12 +12,22 @@ export const CATEGORY_COLORS: Record<string, string> = {
   'Lain-Lain': '#8b5cf6', // Violet
   'Honor': '#a855f7', // Purple
   'Pengemasan': '#f59e0b', // Amber
+  'Kemasan': '#f59e0b',
   'Iklan': '#ec4899', // Pink
+  'Biaya Iklan': '#ec4899',
   'Paket': '#06b6d4', // Cyan
+  'Biaya Paket': '#06b6d4',
   'Pulsa': '#10b981', // Emerald
   'Transportasi': '#f97316', // Orange
   'Biaya Bank': '#14b8a6', // Teal
   'Listrik': '#eab308', // Yellow
+  'Bop': '#38bdf8', // Sky
+  'Cash': '#a3e635', // Lime
+  'Makan': '#fb923c', // Orange
+  'Rokok': '#f43f5e', // Rose
+  'Renovasi': '#c084fc', // Purple
+  'Kasbon Karyawan': '#fdba74', // Peach
+  'Marapthon': '#818cf8', // Indigo
 };
 
 const FALLBACK_PALETTE = [
@@ -25,8 +35,21 @@ const FALLBACK_PALETTE = [
   '#f97316', '#ef4444', '#ec4899', '#a855f7', '#8b5cf6', '#64748b'
 ];
 
+export function toTitleCase(str: string): string {
+  return (str || '')
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export function getCategoryColor(category: string, index = 0): string {
-  const trimmed = category.trim();
+  const trimmed = (category || '').trim();
+  const title = toTitleCase(trimmed);
+  if (CATEGORY_COLORS[title]) {
+    return CATEGORY_COLORS[title];
+  }
   if (CATEGORY_COLORS[trimmed]) {
     return CATEGORY_COLORS[trimmed];
   }
@@ -56,19 +79,46 @@ export function formatExpenseDisplayDate(dateStr: string): string {
 }
 
 /**
- * Robust date parser supporting MM/DD/YYYY, DD/MM/YYYY, and YYYY-MM-DD
+ * Robust date parser supporting MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, DD/MM, and range strings like "04 S/D 30/09/26"
  */
-export function parseExpenseDate(rawDate: unknown): string | null {
+export function parseExpenseDate(rawDate: unknown, fallbackYear = 2026): string | null {
   if (!rawDate) return null;
-  const str = String(rawDate).trim();
+  let str = String(rawDate).trim();
   if (!str) return null;
 
-  // Handle standard YYYY-MM-DD
+  // Ignore summary label
+  if (/^total/i.test(str)) return null;
+
+  // Handle standard YYYY-MM-DD first
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
     return str;
   }
 
+  // Handle range strings e.g. "04 S/D 30/09/26" -> pick the last date "30/09/26"
+  if (/s\/?d/i.test(str)) {
+    const rangeMatch = str.match(/(\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?)$/i);
+    if (rangeMatch) {
+      str = rangeMatch[1];
+    }
+  }
+
   const parts = str.split(/[/\-.]/).map(p => p.trim());
+
+  // Handle DD/MM format (e.g. "01/09" or "25/09")
+  if (parts.length === 2) {
+    let day = parseInt(parts[0], 10);
+    let month = parseInt(parts[1], 10);
+    if (!isNaN(day) && !isNaN(month)) {
+      if (day <= 12 && month > 12) {
+        const tmp = day;
+        day = month;
+        month = tmp;
+      }
+      return `${fallbackYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+    return null;
+  }
+
   if (parts.length !== 3) return null;
 
   let year = '';
@@ -81,21 +131,22 @@ export function parseExpenseDate(rawDate: unknown): string | null {
     month = parts[1].padStart(2, '0');
     day = parts[2].padStart(2, '0');
   } else {
-    // Check two parts: parts[0] and parts[1]
     const p0 = parseInt(parts[0], 10);
     const p1 = parseInt(parts[1], 10);
     year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
 
-    // If p0 > 12, then p0 must be day and p1 month (DD/MM/YYYY)
-    // If p1 > 12, then p1 must be day and p0 month (MM/DD/YYYY)
-    // In our Google Sheet, format is MM/DD/YYYY (e.g. 09/01/2026 = Sept 1)
     if (p0 > 12 && p1 <= 12) {
       day = parts[0].padStart(2, '0');
       month = parts[1].padStart(2, '0');
     } else {
-      // Default to MM/DD/YYYY as seen in Google Sheets
-      month = parts[0].padStart(2, '0');
-      day = parts[1].padStart(2, '0');
+      // If day and month are both <= 12, check if 2-digit year was provided (DD/MM/YY) vs (MM/DD/YYYY)
+      if (parts[2].length === 2) {
+        day = parts[0].padStart(2, '0');
+        month = parts[1].padStart(2, '0');
+      } else {
+        month = parts[0].padStart(2, '0');
+        day = parts[1].padStart(2, '0');
+      }
     }
   }
 
@@ -136,25 +187,41 @@ export function parseExpenseAmount(rawAmount: unknown): number {
  * Parse raw 2D array from Google Sheets API into ExpenseRecord[]
  */
 export function parseGoogleSheetsExpenseData(rows: unknown[][]): ExpenseRecord[] {
-  if (!rows || rows.length < 2) return [];
+  if (!rows || rows.length === 0) return [];
 
-  const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
+  const rawHeaderRow = (rows[0] || []).map(h => String(h || '').trim().toLowerCase());
+  const hasHeaderKeywords = rawHeaderRow.some(h => 
+    h.includes('tanggal') || h.includes('date') ||
+    h.includes('penerima') || h.includes('recipient') ||
+    h.includes('amount') || h.includes('nominal') ||
+    h.includes('kategori') || h.includes('category')
+  );
 
-  // Find column indexes
-  const dateIdx = headers.findIndex(h => h.includes('tanggal') || h.includes('date'));
-  const recipientIdx = headers.findIndex(h => h.includes('penerima') || h.includes('recipient') || h.includes('vendor') || h.includes('keterangan'));
-  const amountIdx = headers.findIndex(h => h.includes('amount') || h.includes('jumlah') || h.includes('biaya') || h.includes('total') || h.includes('nominal'));
-  const categoryIdx = headers.findIndex(h => h.includes('kategori') || h.includes('category'));
+  let dataRows: unknown[][];
+  let finalDateIdx = 0;
+  let finalRecipientIdx = 1;
+  let finalAmountIdx = 2;
+  let finalCategoryIdx = 3;
 
-  // Default fallback column positions if headers slightly differ
-  const finalDateIdx = dateIdx !== -1 ? dateIdx : 0;
-  const finalRecipientIdx = recipientIdx !== -1 ? recipientIdx : 1;
-  const finalAmountIdx = amountIdx !== -1 ? amountIdx : 2;
-  const finalCategoryIdx = categoryIdx !== -1 ? categoryIdx : 3;
+  if (hasHeaderKeywords) {
+    const dateIdx = rawHeaderRow.findIndex(h => h.includes('tanggal') || h.includes('date'));
+    const recipientIdx = rawHeaderRow.findIndex(h => h.includes('penerima') || h.includes('recipient') || h.includes('vendor') || h.includes('keterangan'));
+    const amountIdx = rawHeaderRow.findIndex(h => h.includes('amount') || h.includes('jumlah') || h.includes('biaya') || h.includes('total') || h.includes('nominal'));
+    const categoryIdx = rawHeaderRow.findIndex(h => h.includes('kategori') || h.includes('category'));
+
+    if (dateIdx !== -1) finalDateIdx = dateIdx;
+    if (recipientIdx !== -1) finalRecipientIdx = recipientIdx;
+    if (amountIdx !== -1) finalAmountIdx = amountIdx;
+    if (categoryIdx !== -1) finalCategoryIdx = categoryIdx;
+
+    dataRows = rows.slice(1);
+  } else {
+    dataRows = rows;
+  }
 
   const records: ExpenseRecord[] = [];
 
-  rows.slice(1).forEach((row, index) => {
+  dataRows.forEach((row, index) => {
     if (!row || row.length === 0) return;
 
     const rawDate = row[finalDateIdx];
@@ -162,17 +229,22 @@ export function parseGoogleSheetsExpenseData(rows: unknown[][]): ExpenseRecord[]
     const rawAmount = row[finalAmountIdx];
     const rawCategory = row[finalCategoryIdx];
 
+    // Skip summary / total row
+    const strDate = String(rawDate || '').trim().toLowerCase();
+    const strRecipient = String(rawRecipient || '').trim().toLowerCase();
+    if (strDate === 'total' || strRecipient === 'total') return;
+
     // If both recipient and amount are missing or empty, skip row
     if (!rawRecipient && (rawAmount === undefined || rawAmount === '')) return;
 
-    const date = parseExpenseDate(rawDate) || '1970-01-01';
+    const date = parseExpenseDate(rawDate) || '2026-09-01';
     const recipient = String(rawRecipient || 'Lainnya').trim();
     const amount = parseExpenseAmount(rawAmount);
-    const category = String(rawCategory || 'Lain-Lain').trim() || 'Lain-Lain';
+    const category = toTitleCase(String(rawCategory || 'Lain-Lain').trim()) || 'Lain-Lain';
 
     records.push({
       id: `exp-${index + 1}-${date}-${recipient.replace(/\s+/g, '-').slice(0, 10)}`,
-      sourceRow: index + 2,
+      sourceRow: hasHeaderKeywords ? index + 2 : index + 1,
       date,
       displayDate: formatExpenseDisplayDate(date),
       recipient,

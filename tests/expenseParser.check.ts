@@ -14,6 +14,10 @@ assert.equal(parseExpenseDate('09/01/2026'), '2026-09-01');
 assert.equal(parseExpenseDate('09/25/2026'), '2026-09-25');
 assert.equal(parseExpenseDate('2026-09-15'), '2026-09-15');
 assert.equal(parseExpenseDate('25/09/2026'), '2026-09-25');
+assert.equal(parseExpenseDate('01/09'), '2026-09-01');
+assert.equal(parseExpenseDate('25/09'), '2026-09-25');
+assert.equal(parseExpenseDate('04 S/D 30/09/26'), '2026-09-30');
+assert.equal(parseExpenseDate('Total'), null);
 assert.equal(parseExpenseDate(null), null);
 
 // 2. Amount parser check
@@ -60,5 +64,20 @@ const trends = calculateDailyTrends(parsed);
 assert.equal(trends.length, 3);
 assert.equal(trends[0].date, '2026-09-01');
 assert.equal(trends[0].totalAmount, 5300000);
+
+// 8. Test headerless rows (as in Pengeluaran sheet)
+const headerlessRows = [
+  ['01/09', 'BIAYA ADM ', '6,500', 'BIAYA BANK'],
+  ['01/09', 'BIAYA ADM ', '6,500', 'BIAYA BANK'],
+  ['02/09', 'BIAYA ADM BCA', '20,000', 'BIAYA BANK'],
+  ['Total', '', '33,000']
+];
+const parsedHeaderless = parseGoogleSheetsExpenseData(headerlessRows);
+assert.equal(parsedHeaderless.length, 3); // 'Total' row skipped
+assert.equal(parsedHeaderless[0].recipient, 'BIAYA ADM');
+assert.equal(parsedHeaderless[0].amount, 6500);
+assert.equal(parsedHeaderless[0].date, '2026-09-01');
+assert.equal(parsedHeaderless[0].category, 'Biaya Bank');
+assert.equal(parsedHeaderless[2].amount, 20000);
 
 console.log('expense parser checks passed');
