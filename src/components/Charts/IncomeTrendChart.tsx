@@ -87,14 +87,14 @@ export const IncomeTrendChart: React.FC<IncomeTrendChartProps> = ({ incomes }) =
         </div>
       </div>
 
-      <div className="h-72 w-full flex-1 min-h-[260px]">
+      <div style={{ height: '320px', width: '100%', minHeight: '320px' }} className="flex-1 w-full">
         {dailyData.length === 0 ? (
           <div className="h-full flex items-center justify-center text-sm text-[#64748b]">
             Tidak ada data penerimaan untuk rentang ini
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={dailyData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={320}>
+            <AreaChart data={dailyData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
               <defs>
                 <linearGradient id="incomeAreaGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#10b981" stopOpacity={0.4} />
@@ -111,6 +111,7 @@ export const IncomeTrendChart: React.FC<IncomeTrendChartProps> = ({ incomes }) =
                 tickFormatter={formatTickDate}
                 axisLine={{ stroke: '#334155' }}
                 tickLine={false}
+                minTickGap={20}
               />
 
               <YAxis
@@ -119,6 +120,7 @@ export const IncomeTrendChart: React.FC<IncomeTrendChartProps> = ({ incomes }) =
                 tickFormatter={formatYAxis}
                 axisLine={{ stroke: '#334155' }}
                 tickLine={false}
+                width={65}
               />
 
               <Tooltip
@@ -163,3 +165,4 @@ export const IncomeTrendChart: React.FC<IncomeTrendChartProps> = ({ incomes }) =
     </div>
   );
 };
+

@@ -270,7 +270,8 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({
   }, [plOverview, safeIncomes, expenses]);
 
   const computedDailyPL = useMemo(() => {
-    return dailyPL || calculateDailyProfitLossTrends(safeIncomes, expenses);
+    if (dailyPL && dailyPL.length > 0) return dailyPL;
+    return calculateDailyProfitLossTrends(safeIncomes, expenses);
   }, [dailyPL, safeIncomes, expenses]);
 
   const computedMonthlyPL = useMemo(() => {
