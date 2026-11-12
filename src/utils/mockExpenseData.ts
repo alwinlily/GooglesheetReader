@@ -678,3 +678,29 @@ export const MOCK_EXPENSE_SHEET_DATA: string[][] = [
     "Lain-Lain"
   ]
 ];
+
+export const MOCK_INCOME_SHEET_DATA: string[][] = [
+  ["1/9/26", "TOKOPEDIA", "18,606,754"],
+  ["2/9/26", "TOKOPEDIA", "4,841,597"],
+  ["4/9/26", "TOKOPEDIA", "5,000,000"],
+  ["4/9/26", "TOKOPEDIA", "1,250,000"],
+  ["5/9/26", "TOKOPEDIA", "7,200,000"],
+  ["5/9/26", "TOKOPEDIA", "1,300,000"],
+  ["7/9/26", "TOKOPEDIA", "19,500,000"],
+  ["8/9/26", "TOKOPEDIA", "10,000,000"],
+  ["8/9/26", "TOKOPEDIA", "2,000,000"],
+  ["10/9/26", "TOKOPEDIA", "11,000,000"],
+  ["12/9/26", "TOKOPEDIA", "12,000,000"],
+  ["14/9/26", "TOKOPEDIA", "17,000,000"],
+  ["16/9/26", "TOKOPEDIA", "21,000,000"],
+  ["19/9/26", "TOKOPEDIA", "10,000,000"],
+  ["21/9/26", "TOKOPEDIA", "24,000,000"],
+  ["24/9/26", "TOKOPEDIA", "15,000,000"],
+  ["24/9/26", "TOKOPEDIA", "15,000,000", "194,698,351"]
+];
+
+export const MOCK_PROFIT_LOSS_SHEET_DATA: string[][] = [
+  [],
+  ["Months", "Pemasukan", "Pengeluaran", "Total"],
+  ["9/2026", "194,698,351", "213,075,905", "-18,377,554"]
+];

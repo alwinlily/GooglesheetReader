@@ -43,11 +43,19 @@ function App() {
   } = useOrderData(activeBrand);
   const {
     expenses: expenseData,
+    incomes: incomeData,
+    monthlyPL,
+    dailyPL,
+    plOverview,
+    expenseStats,
+    incomeStats,
+    categories: expenseCategories,
+    incomeSources,
+    dateRange: expenseDateRange,
+    overallDateRange,
     loading: expensesLoading,
     error: expensesError,
     isUsingMock: isExpenseMock,
-    categories: expenseCategories,
-    dateRange: expenseDateRange,
     refresh: refreshExpenses
   } = useExpenseData();
   
@@ -547,7 +555,7 @@ function App() {
               onClick={() => handlePageSwitch('expenses')}
             >
               {!isExpenseUnlocked && <Lock className="w-3 h-3 inline mr-1 text-amber-400" />}
-              Expense Tracker
+              Keuangan & P&L
             </button>
           </div>
           {activePage !== 'expenses' ? (
@@ -566,13 +574,13 @@ function App() {
           ) : (
             <div className="flex items-center gap-2">
               <div className="segmented-control" aria-label="Operasional">
-                <span className="segmented-button active cursor-default">Operasional Umum</span>
+                <span className="segmented-button active cursor-default">Laporan Profit & Loss</span>
               </div>
               {isExpenseUnlocked && (
                 <button
                   onClick={handleLockExpense}
                   className="btn text-xs py-1 px-2.5 flex items-center gap-1.5 text-[#94a3b8] hover:text-rose-400 border-[#334155] hover:border-rose-500/30"
-                  title="Kunci kembali akses Expense Tracker"
+                  title="Kunci kembali akses Keuangan"
                 >
                   <Lock className="w-3 h-3 text-amber-400" />
                   Kunci PIN
@@ -648,11 +656,19 @@ function App() {
         isExpenseUnlocked ? (
           <ExpenseTracker
             expenses={expenseData}
+            incomes={incomeData}
+            monthlyPL={monthlyPL}
+            dailyPL={dailyPL}
+            plOverview={plOverview}
+            expenseStats={expenseStats}
+            incomeStats={incomeStats}
+            incomeSources={incomeSources}
+            categories={expenseCategories}
+            dateRange={expenseDateRange}
+            overallDateRange={overallDateRange}
             loading={expensesLoading}
             error={expensesError}
             isUsingMock={isExpenseMock}
-            categories={expenseCategories}
-            dateRange={expenseDateRange}
             onRefresh={refreshExpenses}
           />
         ) : (

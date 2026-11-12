@@ -6,7 +6,13 @@ import {
   calculateExpenseStats,
   calculateCategorySummaries,
   calculateDailyTrends,
-  formatRupiah
+  formatRupiah,
+  parseGoogleSheetsIncomeData,
+  parseGoogleSheetsProfitLossData,
+  calculateIncomeStats,
+  calculateProfitLossOverview,
+  calculateDailyProfitLossTrends,
+  formatMonthYear
 } from '../src/utils/expenseParser.ts';
 
 // 1. Date parser check
@@ -80,4 +86,50 @@ assert.equal(parsedHeaderless[0].date, '2026-09-01');
 assert.equal(parsedHeaderless[0].category, 'Biaya Bank');
 assert.equal(parsedHeaderless[2].amount, 20000);
 
-console.log('expense parser checks passed');
+// 9. Income parser check
+const sampleIncomeRows = [
+  ["1/9/26", "TOKOPEDIA", "18,606,754"],
+  ["2/9/26", "TOKOPEDIA", "4,841,597"],
+  ["24/9/26", "TOKOPEDIA", "15,000,000", "194,698,351"]
+];
+const parsedIncomes = parseGoogleSheetsIncomeData(sampleIncomeRows);
+assert.equal(parsedIncomes.length, 3);
+assert.equal(parsedIncomes[0].date, '2026-09-01');
+assert.equal(parsedIncomes[0].source, 'Tokopedia');
+assert.equal(parsedIncomes[0].amount, 18606754);
+assert.equal(parsedIncomes[2].amount, 15000000);
+
+// 10. Income stats check
+const incStats = calculateIncomeStats(parsedIncomes);
+assert.equal(incStats.totalAmount, 38448351);
+assert.equal(incStats.transactionCount, 3);
+assert.equal(incStats.topSource.name, 'Tokopedia');
+assert.equal(incStats.largestTransaction.amount, 18606754);
+
+// 11. Profit & Loss parser check
+const samplePLRows = [
+  [],
+  ["Months", "Pemasukan", "Pengeluaran", "Total"],
+  ["9/2026", "194,698,351", "213,075,905", "-18,377,554"]
+];
+const parsedPL = parseGoogleSheetsProfitLossData(samplePLRows);
+assert.equal(parsedPL.length, 1);
+assert.equal(parsedPL[0].month, '2026-09');
+assert.equal(parsedPL[0].displayMonth, 'September 2026');
+assert.equal(parsedPL[0].income, 194698351);
+assert.equal(parsedPL[0].expense, 213075905);
+assert.equal(parsedPL[0].netProfitLoss, -18377554);
+assert.equal(parsedPL[0].status, 'loss');
+
+// 12. P&L Overview check
+const plOverview = calculateProfitLossOverview(parsedIncomes, parsedHeaderless);
+assert.equal(plOverview.totalIncome, 38448351);
+assert.equal(plOverview.totalExpense, 33000);
+assert.equal(plOverview.netProfitLoss, 38448351 - 33000);
+assert.equal(plOverview.status, 'profit');
+
+// 13. Month Year formatting
+assert.equal(formatMonthYear('2026-09'), 'September 2026');
+assert.equal(formatMonthYear('9/2026'), 'September 2026');
+
+console.log('all expense and income parser checks passed');

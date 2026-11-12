@@ -3,7 +3,12 @@ import type {
   ExpenseCategorySummary, 
   ExpenseDailyTrend, 
   ExpenseRecipientSummary, 
-  ExpenseStats 
+  ExpenseStats,
+  IncomeRecord,
+  IncomeStats,
+  MonthlyProfitLossRecord,
+  DailyProfitLossTrend,
+  ProfitLossOverview
 } from '../types/expense';
 
 export const CATEGORY_COLORS: Record<string, string> = {
@@ -434,4 +439,294 @@ export function calculateRecipientSummaries(expenses: ExpenseRecord[], topCount 
     })
     .sort((a, b) => b.totalAmount - a.totalAmount)
     .slice(0, topCount);
+}
+
+/**
+ * Format Month-Year string (e.g. "2026-09" or "9/2026") into Indonesian text (e.g. "September 2026")
+ */
+export function formatMonthYear(monthStr: string): string {
+  if (!monthStr) return '';
+  let year = '';
+  let month = '';
+  if (monthStr.includes('-')) {
+    const parts = monthStr.split('-');
+    year = parts[0];
+    month = parts[1];
+  } else if (monthStr.includes('/')) {
+    const parts = monthStr.split('/');
+    month = parts[0].padStart(2, '0');
+    year = parts[1].length === 2 ? `20${parts[1]}` : parts[1];
+  }
+  const monthNames = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+  const mIdx = parseInt(month, 10) - 1;
+  if (mIdx >= 0 && mIdx < 12) {
+    return `${monthNames[mIdx]} ${year}`;
+  }
+  return monthStr;
+}
+
+/**
+ * Parse raw 2D array from Google Sheets "Pemasukan" tab into IncomeRecord[]
+ */
+export function parseGoogleSheetsIncomeData(rows: unknown[][]): IncomeRecord[] {
+  if (!rows || rows.length === 0) return [];
+
+  // Check if first row is header
+  const firstRow = rows[0] || [];
+  const isHeader = firstRow.some(cell => {
+    const s = String(cell || '').trim().toLowerCase();
+    return s.includes('tanggal') || s.includes('date') || s.includes('platform') || s.includes('pemasukan') || s.includes('amount');
+  });
+
+  const dataRows = isHeader ? rows.slice(1) : rows;
+  const records: IncomeRecord[] = [];
+
+  dataRows.forEach((row, i) => {
+    if (!row || row.length === 0) return;
+    const rawDate = row[0];
+    const rawSource = row[1];
+    const rawAmount = row[2];
+
+    const dateStr = String(rawDate || '').trim();
+    if (!dateStr || /^total/i.test(dateStr)) return;
+
+    const parsedDate = parseExpenseDate(rawDate);
+    if (!parsedDate) return;
+
+    const amount = parseExpenseAmount(rawAmount);
+    if (amount <= 0) return;
+
+    const source = toTitleCase(String(rawSource || 'Lainnya').trim()) || 'Pemasukan Lain';
+
+    records.push({
+      id: `income-${i}-${parsedDate}-${amount}`,
+      sourceRow: (isHeader ? 2 : 1) + i,
+      date: parsedDate,
+      displayDate: formatExpenseDisplayDate(parsedDate),
+      source,
+      amount
+    });
+  });
+
+  return records;
+}
+
+/**
+ * Parse raw 2D array from Google Sheets "Profit/Loss" tab into MonthlyProfitLossRecord[]
+ */
+export function parseGoogleSheetsProfitLossData(rows: unknown[][]): MonthlyProfitLossRecord[] {
+  if (!rows || rows.length === 0) return [];
+
+  const records: MonthlyProfitLossRecord[] = [];
+
+  rows.forEach(row => {
+    if (!row || row.length < 3) return;
+    const rawMonth = String(row[0] || '').trim();
+    if (!rawMonth || /^month/i.test(rawMonth) || /^bulan/i.test(rawMonth)) return;
+
+    // e.g. "9/2026" or "2026-09"
+    const income = parseExpenseAmount(row[1]);
+    const expense = parseExpenseAmount(row[2]);
+    const rawNet = row[3] !== undefined ? parseExpenseAmount(row[3]) : (income - expense);
+    const netProfitLoss = rawNet !== 0 ? rawNet : (income - expense);
+    const margin = income > 0 ? (netProfitLoss / income) * 100 : 0;
+    const status: 'profit' | 'loss' | 'balanced' = netProfitLoss > 0 ? 'profit' : netProfitLoss < 0 ? 'loss' : 'balanced';
+
+    // Normalize month key to "YYYY-MM" if possible
+    let monthKey = rawMonth;
+    if (rawMonth.includes('/')) {
+      const parts = rawMonth.split('/');
+      const m = parts[0].padStart(2, '0');
+      const y = parts[1].length === 2 ? `20${parts[1]}` : parts[1];
+      monthKey = `${y}-${m}`;
+    }
+
+    records.push({
+      month: monthKey,
+      displayMonth: formatMonthYear(rawMonth),
+      income,
+      expense,
+      netProfitLoss,
+      margin,
+      status
+    });
+  });
+
+  return records;
+}
+
+/**
+ * Calculate Income stats (totals, averages, top source)
+ */
+export function calculateIncomeStats(incomes: IncomeRecord[]): IncomeStats {
+  if (incomes.length === 0) {
+    return {
+      totalAmount: 0,
+      transactionCount: 0,
+      dailyAverage: 0,
+      avgTransaction: 0,
+      topSource: { name: '-', amount: 0, percentage: 0 },
+      largestTransaction: { source: '-', amount: 0, date: '-' }
+    };
+  }
+
+  let totalAmount = 0;
+  const sourceTotals: Record<string, number> = {};
+  const uniqueDates = new Set<string>();
+  let largest = incomes[0];
+
+  incomes.forEach(inc => {
+    totalAmount += inc.amount;
+    sourceTotals[inc.source] = (sourceTotals[inc.source] || 0) + inc.amount;
+    uniqueDates.add(inc.date);
+    if (inc.amount > largest.amount) {
+      largest = inc;
+    }
+  });
+
+  let topSourceName = '-';
+  let topSourceAmount = 0;
+  Object.entries(sourceTotals).forEach(([src, amt]) => {
+    if (amt > topSourceAmount) {
+      topSourceAmount = amt;
+      topSourceName = src;
+    }
+  });
+
+  const daysCount = uniqueDates.size || 1;
+
+  return {
+    totalAmount,
+    transactionCount: incomes.length,
+    dailyAverage: Math.round(totalAmount / daysCount),
+    avgTransaction: Math.round(totalAmount / incomes.length),
+    topSource: {
+      name: topSourceName,
+      amount: topSourceAmount,
+      percentage: totalAmount > 0 ? Math.round((topSourceAmount / totalAmount) * 1000) / 10 : 0
+    },
+    largestTransaction: {
+      source: largest.source,
+      amount: largest.amount,
+      date: largest.displayDate
+    }
+  };
+}
+
+/**
+ * Calculate overall Profit & Loss Overview
+ */
+export function calculateProfitLossOverview(incomes: IncomeRecord[], expenses: ExpenseRecord[]): ProfitLossOverview {
+  const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
+  const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const netProfitLoss = totalIncome - totalExpense;
+  const profitMargin = totalIncome > 0 ? (netProfitLoss / totalIncome) * 100 : 0;
+  const expenseToIncomeRatio = totalIncome > 0 ? (totalExpense / totalIncome) * 100 : 0;
+
+  return {
+    totalIncome,
+    totalExpense,
+    netProfitLoss,
+    profitMargin: Math.round(profitMargin * 10) / 10,
+    expenseToIncomeRatio: Math.round(expenseToIncomeRatio * 10) / 10,
+    incomeCount: incomes.length,
+    expenseCount: expenses.length,
+    status: netProfitLoss > 0 ? 'profit' : netProfitLoss < 0 ? 'loss' : 'balanced'
+  };
+}
+
+/**
+ * Calculate daily profit & loss comparison trends
+ */
+export function calculateDailyProfitLossTrends(incomes: IncomeRecord[], expenses: ExpenseRecord[]): DailyProfitLossTrend[] {
+  const dateMap: Record<string, { income: number; expense: number }> = {};
+
+  incomes.forEach(inc => {
+    if (!dateMap[inc.date]) {
+      dateMap[inc.date] = { income: 0, expense: 0 };
+    }
+    dateMap[inc.date].income += inc.amount;
+  });
+
+  expenses.forEach(exp => {
+    if (!dateMap[exp.date]) {
+      dateMap[exp.date] = { income: 0, expense: 0 };
+    }
+    dateMap[exp.date].expense += exp.amount;
+  });
+
+  const sortedDates = Object.keys(dateMap).sort();
+  let runningNet = 0;
+
+  return sortedDates.map(date => {
+    const { income, expense } = dateMap[date];
+    const netProfitLoss = income - expense;
+    runningNet += netProfitLoss;
+
+    return {
+      date,
+      displayDate: formatExpenseDisplayDate(date),
+      income,
+      expense,
+      netProfitLoss,
+      cumulativeNet: runningNet
+    };
+  });
+}
+
+/**
+ * Calculate Monthly Profit Loss summaries, merging computed aggregates with any sheet values
+ */
+export function calculateMonthlyProfitLoss(
+  incomes: IncomeRecord[], 
+  expenses: ExpenseRecord[], 
+  sheetSummary?: MonthlyProfitLossRecord[]
+): MonthlyProfitLossRecord[] {
+  const monthMap: Record<string, { income: number; expense: number }> = {};
+
+  incomes.forEach(inc => {
+    const m = inc.date.substring(0, 7); // YYYY-MM
+    if (!monthMap[m]) monthMap[m] = { income: 0, expense: 0 };
+    monthMap[m].income += inc.amount;
+  });
+
+  expenses.forEach(exp => {
+    const m = exp.date.substring(0, 7);
+    if (!monthMap[m]) monthMap[m] = { income: 0, expense: 0 };
+    monthMap[m].expense += exp.amount;
+  });
+
+  // If sheetSummary provides months not in computed or overrides
+  const result: MonthlyProfitLossRecord[] = [];
+  const allMonths = Array.from(new Set([
+    ...Object.keys(monthMap),
+    ...(sheetSummary || []).map(s => s.month)
+  ])).sort();
+
+  allMonths.forEach(m => {
+    const computed = monthMap[m] || { income: 0, expense: 0 };
+    const sheetItem = sheetSummary?.find(s => s.month === m);
+
+    // Prefer computed if it has values, otherwise sheetItem
+    const income = computed.income > 0 ? computed.income : (sheetItem?.income || 0);
+    const expense = computed.expense > 0 ? computed.expense : (sheetItem?.expense || 0);
+    const netProfitLoss = income - expense;
+    const margin = income > 0 ? (netProfitLoss / income) * 100 : 0;
+    const status: 'profit' | 'loss' | 'balanced' = netProfitLoss > 0 ? 'profit' : netProfitLoss < 0 ? 'loss' : 'balanced';
+
+    result.push({
+      month: m,
+      displayMonth: sheetItem?.displayMonth || formatMonthYear(m),
+      income,
+      expense,
+      netProfitLoss,
+      margin: Math.round(margin * 10) / 10,
+      status
+    });
+  });
+
+  return result;
 }
