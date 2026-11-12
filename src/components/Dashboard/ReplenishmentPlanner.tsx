@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { Search, TriangleAlert, CirclePause, Calendar, CircleArrowDown, Info, TrendingDown, Package } from 'lucide-react';
+import { Search, TriangleAlert, CirclePause, Calendar, CircleArrowDown, Info, TrendingDown, Package, ArrowUpRight } from 'lucide-react';
 import type { InventoryRecord, Size } from '../../types/inventory';
 import type { ProductMetadata } from '../../hooks/useInventoryData';
 import type { OrderRecord } from '../../types/order';
@@ -13,6 +13,7 @@ interface ReplenishmentPlannerProps {
     orders?: OrderRecord[];
     startDate?: string;
     endDate?: string;
+    onNavigateToOrder?: (product: string, size?: string) => void;
     children?: ReactNode;
 }
 
@@ -38,7 +39,14 @@ interface PlannerItem {
     latestVendor: string | null;
 }
 
-const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, orders = [], startDate, endDate, children }) => {
+const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ 
+    data, 
+    orders = [], 
+    startDate, 
+    endDate, 
+    onNavigateToOrder,
+    children 
+}) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'All' | ReplenishmentStatus>('All');
     const [sortBy, setSortBy] = useState<'product' | 'size' | 'currentStock' | 'velocity' | 'restockInterval' | 'minStock' | 'daysToStockOut' | 'status'>('daysToStockOut');
@@ -327,13 +335,20 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, order
         switch (item.status) {
             case 'On Order':
                 return (
-                    <span 
-                        className="status-badge status-badge-ordered" 
-                        data-tooltip={`Barang sudah diorder (${item.orderedQty.toLocaleString('id-ID')} pcs) di Order Tracker. Status: Dalam Produksi.`}
+                    <button 
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onNavigateToOrder?.(item.product, item.size);
+                        }}
+                        className="status-badge status-badge-ordered cursor-pointer hover:brightness-125 hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 select-none shadow-sm hover:shadow-[#38bdf8]/20 group" 
+                        data-tooltip={`Barang sudah diorder (${item.orderedQty.toLocaleString('id-ID')} pcs) di Order Tracker. Klik untuk melihat detail order.`}
+                        title={`Buka order ${item.product} (${item.size}) di Order Tracker`}
                     >
-                        <Package className="w-3.5 h-3.5 flex-shrink-0" />
-                        Sudah Diorder
-                    </span>
+                        <Package className="w-3.5 h-3.5 flex-shrink-0 text-[#38bdf8] group-hover:scale-110 transition-transform" />
+                        <span>Sudah Diorder</span>
+                        <ArrowUpRight className="w-3 h-3 text-[#38bdf8] opacity-75 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                    </button>
                 );
             case 'Out of Stock':
                 return (
@@ -567,6 +582,16 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, order
                                                 Lihat detail
                                             </summary>
                                             <p className="mt-2 leading-relaxed text-[#94a3b8]">{item.suggestion}</p>
+                                            {item.status === 'On Order' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onNavigateToOrder?.(item.product, item.size)}
+                                                    className="mt-2.5 inline-flex items-center gap-1.5 text-xs text-[#38bdf8] hover:text-[#7dd3fc] font-bold cursor-pointer transition-colors group"
+                                                >
+                                                    <span>Lihat pesanan ini di Order Tracker</span>
+                                                    <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                                                </button>
+                                            )}
                                         </details>
 
                                     </td>
@@ -623,10 +648,16 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ data, order
                                     </td>
                                     <td className="py-4.5 px-4 text-left text-[#cbd5e1] whitespace-nowrap">
                                         {item.status === 'On Order' ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium text-[#38bdf8] bg-[#0284c7]/10 border border-[#38bdf8]/20">
+                                            <button
+                                                type="button"
+                                                onClick={() => onNavigateToOrder?.(item.product, item.size)}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold text-[#38bdf8] bg-[#0284c7]/15 border border-[#38bdf8]/30 hover:bg-[#0284c7]/30 hover:border-[#38bdf8] cursor-pointer transition-all group"
+                                                title={`Buka order ${item.product} (${item.size}) di Order Tracker`}
+                                            >
                                                 <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] animate-pulse"></span>
-                                                Dalam Produksi
-                                            </span>
+                                                <span>Dalam Produksi</span>
+                                                <ArrowUpRight className="w-3 h-3 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                                            </button>
                                         ) : item.status === 'Out of Stock' || (item.status === 'Order Soon' && item.daysToReorder === 0)
                                             ? 'Hari ini'
                                             : item.reorderDateStr ?? '—'}

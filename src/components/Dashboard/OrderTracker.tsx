@@ -6,18 +6,27 @@ import {
   Search,
   Filter,
   XCircle,
-  Activity
+  Activity,
+  X
 } from 'lucide-react';
 import type { OrderRecord } from '../../types/order';
 import { OrderAccuracyChart } from '../Charts/OrderAccuracyChart';
 import { KonveksiPerformanceChart } from '../Charts/KonveksiPerformanceChart';
 import { formatFullDate } from '../../utils/dateUtils';
+import { matchesOrderProduct } from '../../utils/productMatching';
+
+export interface TargetOrderFilter {
+  product: string;
+  size?: string;
+}
 
 interface OrderTrackerProps {
   orders: OrderRecord[];
   loading: boolean;
   error: string | null;
   uniqueKonveksi: string[];
+  targetProduct?: TargetOrderFilter | null;
+  onClearTargetProduct?: () => void;
 }
 
 const getFulfillmentDuration = (dateOrder: string, dateReceived: string | null) => {
@@ -35,8 +44,21 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
   orders, 
   loading, 
   error,
-  uniqueKonveksi
+  uniqueKonveksi,
+  targetProduct,
+  onClearTargetProduct
 }) => {
+  // --- Target Product Navigation Filter ---
+  const [activeTarget, setActiveTarget] = useState<TargetOrderFilter | null>(targetProduct || null);
+
+  useEffect(() => {
+    setActiveTarget(targetProduct || null);
+    if (targetProduct) {
+      // Auto expand all batches so user sees the target item immediately
+      setCollapsedBatches({});
+    }
+  }, [targetProduct]);
+
   // --- States for Active Production Section ---
   const [activeVendorFilter, setActiveVendorFilter] = useState('All');
   const [activeAgeFilter, setActiveAgeFilter] = useState('All');
@@ -57,7 +79,7 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
   // Reset page when ledger filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedVendor, selectedStatus]);
+  }, [searchTerm, selectedVendor, selectedStatus, activeTarget]);
 
   useEffect(() => {
     if (selectedVendor !== 'All' && !uniqueKonveksi.includes(selectedVendor)) {
@@ -380,7 +402,12 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
 
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
-      const matchSearch = o.item.toLowerCase().includes(searchTerm.toLowerCase());
+      let matchSearch = true;
+      if (activeTarget && !searchTerm) {
+        matchSearch = matchesOrderProduct(activeTarget.product, o.item, activeTarget.size);
+      } else if (searchTerm) {
+        matchSearch = o.item.toLowerCase().includes(searchTerm.toLowerCase());
+      }
       const matchVendor = selectedVendor === 'All' || o.konveksi === selectedVendor;
       
       let matchStatus = true;
@@ -392,7 +419,7 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
       
       return matchSearch && matchVendor && matchStatus;
     });
-  }, [orders, searchTerm, selectedVendor, selectedStatus]);
+  }, [orders, activeTarget, searchTerm, selectedVendor, selectedStatus]);
 
   const sortedOrders = useMemo(() => {
     const sorted = [...filteredOrders];
@@ -461,6 +488,39 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
   return (
     <div className="flex flex-col gap-8 animate-in fade-in duration-300">
       
+      {/* Target Product Navigation Banner */}
+      {activeTarget && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-sky-950/70 via-blue-950/50 to-[#0f172a] border border-sky-500/40 text-xs text-sky-200 shadow-xl shadow-sky-500/10 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 shrink-0">
+              <Package className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <p className="text-[11px] text-sky-300 font-medium">Memfilter order untuk barang dari Rencana Pemesanan:</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-sm font-extrabold text-white">{activeTarget.product}</span>
+                {activeTarget.size && (
+                  <span className="px-2 py-0.5 rounded bg-sky-500/20 border border-sky-400/40 text-sky-300 text-xs font-mono font-bold">
+                    Ukuran {activeTarget.size}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setActiveTarget(null);
+              setSearchTerm('');
+              onClearTargetProduct?.();
+            }}
+            className="btn text-xs py-1.5 px-3.5 border-sky-500/40 bg-sky-500/20 hover:bg-sky-500/30 text-white font-bold flex items-center gap-1.5 cursor-pointer rounded-xl transition-all hover:scale-105 active:scale-95"
+          >
+            <X className="w-3.5 h-3.5" />
+            Tampilkan Semua Order
+          </button>
+        </div>
+      )}
+
       {/* 1. Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         
@@ -874,9 +934,10 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
               </thead>
               <tbody className="text-[#f1f5f9]">
                 {batchesList.map((batch, idx) => {
+                  const containsTarget = Boolean(activeTarget && batch.items.some(it => matchesOrderProduct(activeTarget.product, it.item, activeTarget.size)));
                   const isCollapsed = collapsedBatches[batch.tanggalMulai] !== undefined 
                     ? collapsedBatches[batch.tanggalMulai] 
-                    : idx !== 0;
+                    : (containsTarget ? false : idx !== 0);
 
                   const dateObj = new Date(batch.tanggalMulai);
                   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -905,16 +966,26 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
                         aria-expanded={!isCollapsed}
                         onClick={toggleBatch}
                         onKeyDown={handleKeyDown}
-                        className="bg-[#1e293b]/60 hover:bg-[#1e293b]/90 border-b border-[#334155]/30 cursor-pointer select-none transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className={`border-b border-[#334155]/30 cursor-pointer select-none transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                          containsTarget 
+                            ? 'bg-sky-950/40 hover:bg-sky-950/60' 
+                            : 'bg-[#1e293b]/60 hover:bg-[#1e293b]/90'
+                        }`}
                       >
                         <td colSpan={3} className="py-3.5 px-4 font-bold text-[#f1f5f9]">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs text-[#9ca3af]">
                               {isCollapsed ? '▸' : '▾'}
                             </span>
                             <span>
                               {dateLabel} — {batch.label}
                             </span>
+                            {containsTarget && (
+                              <span className="ml-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#0284c7]/20 border border-[#38bdf8]/40 text-[#38bdf8] flex items-center gap-1">
+                                <Package className="w-2.5 h-2.5" />
+                                Memuat order target
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td colSpan={2} className="py-3.5 px-4 text-right font-bold text-[#9ca3af]">
@@ -925,13 +996,26 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({
                       {/* Items under this batch */}
                       {!isCollapsed && batch.items.map((item, itemIdx) => {
                         const age = getAgeIndicator(item);
+                        const isTarget = Boolean(activeTarget && matchesOrderProduct(activeTarget.product, item.item, activeTarget.size));
                         return (
                           <tr 
                             key={itemIdx} 
-                            className="border-b border-[#334155]/10 hover:bg-white/[0.04] transition-colors even:bg-white/[0.015]"
+                            className={`border-b border-[#334155]/10 transition-colors ${
+                              isTarget 
+                                ? 'bg-[#0284c7]/20 border-l-4 border-l-[#38bdf8] text-white' 
+                                : 'hover:bg-white/[0.04] even:bg-white/[0.015]'
+                            }`}
                           >
                             <td className="py-3 px-4 font-semibold text-[#f1f5f9] pl-8">
-                              {item.item}
+                              <div className="flex items-center gap-2">
+                                <span>{item.item}</span>
+                                {isTarget && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#0284c7] text-white shadow-sm shadow-[#0284c7]/40 flex items-center gap-1">
+                                    <Package className="w-2.5 h-2.5" />
+                                    Barang Terpilih
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="py-3 px-4 text-[#e2e8f0]">
                               {item.konveksi}

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { matchProductAndSize, findActiveOrderForProduct } from '../src/utils/productMatching.ts';
+import { matchProductAndSize, findActiveOrderForProduct, matchesOrderProduct } from '../src/utils/productMatching.ts';
 import type { OrderRecord } from '../src/types/order.ts';
 
 // 1. Exact & alias matching tests
@@ -89,6 +89,13 @@ assert.equal(mtrlMatch.totalOrderedQty, 0);
 const pytonMatch = findActiveOrderForProduct('Pyton', 'S', mockOrders);
 assert.equal(pytonMatch.isOnOrder, false);
 assert.equal(pytonMatch.totalOrderedQty, 0);
+
+// 3. matchesOrderProduct tests
+assert.equal(matchesOrderProduct('Juna hp', 'Juna L', 'L'), true);
+assert.equal(matchesOrderProduct('Juna hp', 'Juna L'), true); // without size
+assert.equal(matchesOrderProduct('Odds hitam', 'Odds Black XL'), true);
+assert.equal(matchesOrderProduct('Mtrl Grey', 'Special Grey S'), true);
+assert.equal(matchesOrderProduct('Juna hp', 'Odds Black L'), false);
 
 console.log('product matching checks passed');
 

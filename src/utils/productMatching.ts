@@ -114,3 +114,27 @@ export function findActiveOrderForProduct(
   };
 }
 
+/**
+ * Checks if an Order item matches a product (and optionally a size),
+ * taking into account known aliases (e.g. Juna hp -> Juna, Odds hitam -> Odds Black, etc.)
+ */
+export function matchesOrderProduct(
+  invProduct: string,
+  orderItem: string,
+  invSize?: string
+): boolean {
+  if (!invProduct || !orderItem) return false;
+  if (invSize) {
+    return matchProductAndSize(invProduct, invSize, orderItem);
+  }
+  const commonSizes = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '2XL'];
+  for (const s of commonSizes) {
+    if (matchProductAndSize(invProduct, s, orderItem)) return true;
+  }
+  const normProduct = normalizeProductText(invProduct);
+  const normItem = normalizeProductText(orderItem);
+  const aliases = KNOWN_PRODUCT_ALIASES[normProduct] || [normProduct];
+  return aliases.some(alias => normItem.includes(alias));
+}
+
+

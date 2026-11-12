@@ -31,6 +31,7 @@ function App() {
   });
   const [showPinModal, setShowPinModal] = useState(false);
   const [targetPendingPage, setTargetPendingPage] = useState<'inventory' | 'orders' | 'expenses' | null>(null);
+  const [targetOrderFilter, setTargetOrderFilter] = useState<{ product: string; size?: string } | null>(null);
 
   const [activeBrand, setActiveBrand] = useState<'Kaos Dika' | 'Marapthon'>('Kaos Dika');
   const { data, productMetadata, loading, error, products, dateRange, refresh } = useInventoryData(activeBrand);
@@ -87,6 +88,11 @@ function App() {
       return;
     }
     setActivePage(page);
+  };
+
+  const handleNavigateToOrder = (product: string, size?: string) => {
+    setTargetOrderFilter({ product, size });
+    setActivePage('orders');
   };
 
   const handlePinSuccess = () => {
@@ -616,6 +622,7 @@ function App() {
             orders={orderData}
             startDate={startDate} 
             endDate={endDate}
+            onNavigateToOrder={handleNavigateToOrder}
           >
             <SummaryCards {...stats} previous={previousStats} />
             <StockTrendChart
@@ -649,6 +656,8 @@ function App() {
           loading={ordersLoading}
           error={ordersError}
           uniqueKonveksi={uniqueKonveksi}
+          targetProduct={targetOrderFilter}
+          onClearTargetProduct={() => setTargetOrderFilter(null)}
         />
       )}
 
