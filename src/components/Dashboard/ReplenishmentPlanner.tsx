@@ -383,6 +383,8 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
 
     return (
         <section className="planner-section w-full">
+            {children && <div className="mb-8">{children}</div>}
+
             <div className="flex flex-wrap gap-2 mb-6" aria-label="Filter status pemesanan">
                 <button type="button"
                     onClick={() => setStatusFilter('Order Soon')}
@@ -454,8 +456,6 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
                     <span className="text-sm text-white font-extrabold font-numeric">{summary.total}</span>
                 </button>
             </div>
-
-            {children && <div className="mb-8">{children}</div>}
 
             <div className="glass-card w-full shadow-soft border border-[#334155]/80">
 

@@ -8,7 +8,7 @@ import SummaryCards from './components/Dashboard/SummaryCards';
 import StockTrendChart from './components/Charts/StockTrendChart';
 import TopSalesTable from './components/Dashboard/TopSalesTable';
 import UnifiedForecastChart from './components/Charts/UnifiedForecastChart';
-import StockBreakdownChart from './components/Charts/StockBreakdownChart';
+
 import ReplenishmentPlanner from './components/Dashboard/ReplenishmentPlanner';
 import { OrderTracker } from './components/Dashboard/OrderTracker';
 import { ExpenseTracker } from './components/Dashboard/ExpenseTracker';
@@ -404,23 +404,6 @@ function App() {
 
 
 
-  const stockBreakdown = useMemo(() => {
-    const breakdown: Record<string, number> = { 'S': 0, 'M': 0, 'L': 0, 'XL': 0, 'XXL': 0 };
-
-    // Get latest stock per product+size from the full filtered dataset
-    const latestStocks: Record<string, number> = {};
-    const sortedData = [...filteredData].sort((a, b) => b.date.localeCompare(a.date));
-
-    for (const r of sortedData) {
-      const key = `${r.product}-${r.size}`;
-      if (r.stock !== null && latestStocks[key] === undefined) {
-        latestStocks[key] = r.stock;
-        breakdown[r.size] = (breakdown[r.size] || 0) + r.stock;
-      }
-    }
-
-    return Object.entries(breakdown).map(([size, stock]) => ({ size, stock }));
-  }, [filteredData]);
 
   const currentMinStock = useMemo(() => {
     if (selectedProduct === 'All') return undefined;
@@ -638,10 +621,7 @@ function App() {
           </ReplenishmentPlanner>
 
           <div className="flex flex-col gap-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <TopSalesTable data={topSalesData} />
-              <StockBreakdownChart data={stockBreakdown} />
-            </div>
+            <TopSalesTable data={topSalesData} />
 
             {selectedProduct !== 'All' && (
               <UnifiedForecastChart data={unifiedForecastData} productName={selectedProduct} />
