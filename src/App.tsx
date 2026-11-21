@@ -3,6 +3,8 @@ import { useInventoryData } from './hooks/useInventoryData';
 import { useOrderData } from './hooks/useOrderData';
 import { useExpenseData } from './hooks/useExpenseData';
 import Header from './components/Dashboard/Header';
+import SizePriorities from './components/Dashboard/SizePriorities';
+import DataFreshness from './components/Dashboard/DataFreshness';
 import Filters from './components/Dashboard/Filters';
 import SummaryCards from './components/Dashboard/SummaryCards';
 import StockTrendChart from './components/Charts/StockTrendChart';
@@ -34,7 +36,7 @@ function App() {
   const [targetOrderFilter, setTargetOrderFilter] = useState<{ product: string; size?: string } | null>(null);
 
   const [activeBrand, setActiveBrand] = useState<'Kaos Dika' | 'Marapthon'>('Kaos Dika');
-  const { data, productMetadata, loading, error, products, dateRange, refresh } = useInventoryData(activeBrand);
+  const { data, productMetadata, loading, error, products, dateRange, refresh, lastSyncedAt, latestTransactionDate, source } = useInventoryData(activeBrand);
   const { 
     orders: orderData, 
     uniqueKonveksi, 
@@ -485,7 +487,7 @@ function App() {
     return dataPoints;
   }, [filteredData, selectedProduct, selectedSize, productMetadata, dateRange]);
 
-  if (activePage === 'inventory' && error) {
+  if (activePage === 'inventory' && error && !data.length) {
     return (
       <div className="dashboard-container flex items-center justify-center" style={{ height: '100vh' }}>
         <div className="card text-center">
@@ -586,6 +588,7 @@ function App() {
       </Header>
       {activePage === 'inventory' && (
         <>
+          <DataFreshness lastSyncedAt={lastSyncedAt} latestTransactionDate={latestTransactionDate} source={source} loading={loading} error={error} onRefresh={refresh} />
           <Filters
             products={products}
             selectedProduct={selectedProduct}
@@ -599,7 +602,15 @@ function App() {
             onEndDateChange={setEndDate}
           />
 
-          <ReplenishmentPlanner 
+          <nav aria-label="Pintasan inventori" className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="mr-1 font-semibold text-slate-400">Langsung ke</span>
+            {([['#rencana-pemesanan', 'Rencana pemesanan'], ['#prioritas-ukuran', 'Prioritas ukuran'], ['#penjualan-teratas', 'Penjualan teratas']] as const).map(([href, label]) => (
+              <a key={href} href={href} className="inline-flex min-h-10 items-center rounded-full border border-slate-700 px-3 text-slate-200 transition-colors hover:border-sky-400 hover:text-sky-300 focus-visible:outline-2 focus-visible:outline-sky-400">{label}</a>
+            ))}
+          </nav>
+
+          <ReplenishmentPlanner
+            mismatches={validationMismatches}
             data={scopedData} 
             productMetadata={productMetadata} 
             orders={orderData}
@@ -620,8 +631,10 @@ function App() {
             />
           </ReplenishmentPlanner>
 
+          <SizePriorities key={activeBrand} data={data} selectedProduct={selectedProduct} selectedSize={selectedSize} startDate={startDate} endDate={endDate} loading={loading} onNavigateToOrder={handleNavigateToOrder} />
+
           <div className="flex flex-col gap-8">
-            <TopSalesTable data={topSalesData} />
+            <div id="penjualan-teratas" tabIndex={-1} className="scroll-mt-6"><TopSalesTable data={topSalesData} /></div>
 
             {selectedProduct !== 'All' && (
               <UnifiedForecastChart data={unifiedForecastData} productName={selectedProduct} />
@@ -682,9 +695,7 @@ function App() {
         )
       )}
 
-      <footer className="mt-8 text-center text-secondary text-sm pb-8">
-        <p>Data per {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}, {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }).replace(/\./g, ':')}</p>
-      </footer>
+
 
       {/* PIN Verification Modal */}
       <PinModal

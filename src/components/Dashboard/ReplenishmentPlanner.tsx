@@ -6,9 +6,12 @@ import type { ProductMetadata } from '../../hooks/useInventoryData';
 import type { OrderRecord } from '../../types/order';
 import { findActiveOrderForProduct } from '../../utils/productMatching';
 import { formatFullDate } from '../../utils/dateUtils';
+import type { InventoryMismatch } from '../../utils/inventoryValidation';
+import InventoryMismatchDetails from './InventoryMismatchDetails';
 
 interface ReplenishmentPlannerProps {
     data: InventoryRecord[];
+    mismatches: readonly InventoryMismatch[];
     productMetadata: Record<string, Record<string, ProductMetadata>>;
     orders?: OrderRecord[];
     startDate?: string;
@@ -17,7 +20,7 @@ interface ReplenishmentPlannerProps {
     children?: ReactNode;
 }
 
-export type ReplenishmentStatus = 'Out of Stock' | 'Order Soon' | 'On Order' | 'Hold Order' | 'Stable';
+export type ReplenishmentStatus = 'Out of Stock' | 'Order Soon' | 'Hold Order' | 'Stable';
 
 interface PlannerItem {
     product: string;
@@ -41,6 +44,7 @@ interface PlannerItem {
 
 const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({ 
     data, 
+    mismatches,
     orders = [], 
     startDate, 
     endDate, 
@@ -48,13 +52,24 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
     children 
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'All' | ReplenishmentStatus>('All');
+    const [statusFilter, setStatusFilter] = useState<'All' | 'On Order' | ReplenishmentStatus>('All');
     const [sortBy, setSortBy] = useState<'product' | 'size' | 'currentStock' | 'velocity' | 'restockInterval' | 'minStock' | 'daysToStockOut' | 'status'>('daysToStockOut');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [showExtraCols, setShowExtraCols] = useState(false);
 
     const [pageSize, setPageSize] = useState<number>(10);
     const [currentPage, setCurrentPage] = useState<number>(1);
+
+    const mismatchesByItem = useMemo(() => {
+        const grouped = new Map<string, InventoryMismatch[]>();
+        for (const mismatch of mismatches) {
+            const key = JSON.stringify([mismatch.product, mismatch.size]);
+            const group = grouped.get(key);
+            if (group) group.push(mismatch);
+            else grouped.set(key, [mismatch]);
+        }
+        return grouped;
+    }, [mismatches]);
 
     const [prevSearchTerm, setPrevSearchTerm] = useState(searchTerm);
     const [prevStatusFilter, setPrevStatusFilter] = useState(statusFilter);
@@ -163,9 +178,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
 
             // 8. Determine status based on active order or days to stockout (60 days = 2 months threshold)
             let status: ReplenishmentStatus = 'Stable';
-            if (isOnOrder) {
-                status = 'On Order';
-            } else if (currentStock <= 0) {
+            if (currentStock <= 0) {
                 status = 'Out of Stock';
             } else if (velocity === 0) {
                 status = 'Stable';
@@ -188,7 +201,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
                 return targetDate.toLocaleDateString('id-ID', { month: 'short', day: 'numeric', year: 'numeric' });
             };
 
-            if (status === 'On Order') {
+            if (isOnOrder) {
                 const vendorPart = latestVendor ? ` ke vendor ${latestVendor}` : '';
                 const datePart = latestOrderDate ? ` pada tanggal ${formatFullDate(latestOrderDate)}` : '';
                 suggestion = `Barang sudah diorder sebanyak ${orderedQty.toLocaleString('id-ID')} pcs di Order Tracker (Status: Dalam Produksi)${vendorPart}${datePart}. Stok saat ini: ${currentStock.toLocaleString('id-ID')} unit (Batas aman: ${minStock.toLocaleString('id-ID')} unit).`;
@@ -256,9 +269,9 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
 
         plannerItems.forEach(item => {
             counts.total++;
+            if (item.isOnOrder) counts.onOrder++;
             if (item.status === 'Out of Stock') counts.outOfStock++;
             else if (item.status === 'Order Soon') counts.orderSoon++;
-            else if (item.status === 'On Order') counts.onOrder++;
             else if (item.status === 'Hold Order') counts.holdOrder++;
             else if (item.status === 'Stable') counts.stable++;
         });
@@ -281,7 +294,6 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
         const statusPriority: Record<ReplenishmentStatus, number> = {
             'Out of Stock': 1,
             'Order Soon': 2,
-            'On Order': 3,
             'Hold Order': 4,
             'Stable': 5,
         };
@@ -290,6 +302,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
             .filter(item => {
                 const matchesSearch = item.product.toLowerCase().includes(searchTerm.toLowerCase());
                 const matchesStatus = statusFilter === 'All'
+                    || (statusFilter === 'On Order' && item.isOnOrder)
                     || item.status === statusFilter
                     || (statusFilter === 'Hold Order' && item.status === 'Stable');
                 return matchesSearch && matchesStatus;
@@ -333,35 +346,18 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
 
     const getStatusBadge = (item: PlannerItem) => {
         switch (item.status) {
-            case 'On Order':
-                return (
-                    <button 
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onNavigateToOrder?.(item.product, item.size);
-                        }}
-                        className="status-badge status-badge-ordered cursor-pointer hover:brightness-125 hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 select-none shadow-sm hover:shadow-[#38bdf8]/20 group" 
-                        data-tooltip={`Barang sudah diorder (${item.orderedQty.toLocaleString('id-ID')} pcs) di Order Tracker. Klik untuk melihat detail order.`}
-                        title={`Buka order ${item.product} (${item.size}) di Order Tracker`}
-                    >
-                        <Package className="w-3.5 h-3.5 flex-shrink-0 text-[#38bdf8] group-hover:scale-110 transition-transform" />
-                        <span>Sudah Diorder</span>
-                        <ArrowUpRight className="w-3 h-3 text-[#38bdf8] opacity-75 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-                    </button>
-                );
             case 'Out of Stock':
                 return (
-                    <span className="status-badge status-badge-out" data-tooltip="Stok produk kosong. Segera buat pemesanan untuk menghindari hilangnya potensi penjualan.">
+                    <span className="status-badge status-badge-out" data-tooltip="Tidak ada stok tersedia.">
                         <CircleArrowDown className="w-3.5 h-3.5 flex-shrink-0" />
                         Stok Habis
                     </span>
                 );
             case 'Order Soon':
                 return (
-                    <span className="status-badge status-badge-soon" data-tooltip="Stok menipis dan akan habis dalam < 60 hari. Disarankan segera memesan ulang.">
+                    <span className="status-badge status-badge-soon" data-tooltip="Stok diperkirakan habis dalam kurang dari 60 hari.">
                         <TriangleAlert className="w-3.5 h-3.5 flex-shrink-0" />
-                        Order Segera
+                        Stok Menipis
                     </span>
                 );
             case 'Hold Order':
@@ -385,7 +381,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
         <section className="planner-section w-full">
             {children && <div className="mb-8">{children}</div>}
 
-            <div className="flex flex-wrap gap-2 mb-6" aria-label="Filter status pemesanan">
+            <div id="rencana-pemesanan" tabIndex={-1} role="group" className="flex flex-wrap gap-2 mb-2 scroll-mt-6" aria-label="Filter status pemesanan">
                 <button type="button"
                     onClick={() => setStatusFilter('Order Soon')}
                     aria-pressed={statusFilter === 'Order Soon'}
@@ -396,7 +392,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
                     }`}
                 >
                     <TriangleAlert className="w-4 h-4 text-[#f59e0b]" />
-                    <span className="text-xs text-[#cbd5e1] font-bold">Order Segera</span>
+                    <span className="text-xs text-[#cbd5e1] font-bold">Stok Menipis</span>
                     <span className="text-sm text-[#fbbf24] font-extrabold font-numeric">{summary.orderSoon}</span>
                 </button>
 
@@ -457,6 +453,8 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
                 </button>
             </div>
 
+            <p className="text-xs text-[#94a3b8] mb-6">Barang yang sudah diorder tetap dihitung sesuai kondisi stoknya.</p>
+
             <div className="glass-card w-full shadow-soft border border-[#334155]/80">
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-[#334155]/40 pb-5">
@@ -465,8 +463,8 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
                         <Calendar className="w-5 h-5 text-[#94a3b8]" />
                     </div>
                     <div>
-                        <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em] mb-0.5">
-                            Rencana Pemesanan
+                        <h3 className="section-heading mb-0.5">
+                            Rencana pemesanan
                         </h3>
                         <p className="text-xs text-[#94a3b8]">
                             Stok minimum dihitung dari laju penjualan dan siklus restok aktual.
@@ -499,38 +497,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
                     </button>
                 </div>
 
-                <div className="filter-tabs-container flex-shrink-0">
-                    <button 
-                        onClick={() => setStatusFilter('All')}
-                        className={`filter-tab ${statusFilter === 'All' ? 'active-all' : ''}`}
-                    >
-                        Semua
-                    </button>
-                    <button 
-                        onClick={() => setStatusFilter('Order Soon')}
-                        className={`filter-tab ${statusFilter === 'Order Soon' ? 'active-soon' : ''}`}
-                    >
-                        Order Segera
-                    </button>
-                    <button 
-                        onClick={() => setStatusFilter('On Order')}
-                        className={`filter-tab ${statusFilter === 'On Order' ? 'active-ordered' : ''}`}
-                    >
-                        Sudah Diorder
-                    </button>
-                    <button 
-                        onClick={() => setStatusFilter('Hold Order')}
-                        className={`filter-tab ${statusFilter === 'Hold Order' ? 'active-hold' : ''}`}
-                    >
-                        Tunda Order
-                    </button>
-                    <button 
-                        onClick={() => setStatusFilter('Out of Stock')}
-                        className={`filter-tab ${statusFilter === 'Out of Stock' ? 'active-out' : ''}`}
-                    >
-                        Stok Habis
-                    </button>
-                </div>
+
             </div>
 
             {/* Main Table */}
@@ -564,7 +531,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
                                 Estimasi Habis {sortBy === 'daysToStockOut' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                             </th>
                             <th className="py-4 px-4 text-center font-bold tracking-wider cursor-pointer hover:text-white uppercase text-xs col-status" onClick={() => handleSort('status')}>
-                                Status Indikator {sortBy === 'status' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
+                                Kondisi Stok {sortBy === 'status' && (sortOrder === 'asc' ? ' ▲' : ' ▼')}
                             </th>
                             <th className="py-4 px-4 text-right font-bold uppercase text-xs">Order</th>
                             <th className="py-4 px-4 text-left font-bold uppercase text-xs">Batas Order</th>
@@ -582,7 +549,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
                                                 Lihat detail
                                             </summary>
                                             <p className="mt-2 leading-relaxed text-[#94a3b8]">{item.suggestion}</p>
-                                            {item.status === 'On Order' && (
+                                            {item.isOnOrder && (
                                                 <button
                                                     type="button"
                                                     onClick={() => onNavigateToOrder?.(item.product, item.size)}
@@ -601,20 +568,20 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
                                         </span>
                                     </td>
                                     <td className="py-4.5 px-4 text-right font-extrabold text-white font-numeric text-sm col-stock">
-                                        {item.currentStock.toLocaleString('id-ID')} pcs
+                                        {item.currentStock.toLocaleString('id-ID')} <span className="metric-unit">pcs</span>
                                     </td>
                                     {showExtraCols && (
                                         <>
                                             <td className="py-4.5 px-4 text-right text-[#94a3b8] font-numeric font-medium text-sm col-velocity">
-                                                {item.velocity.toLocaleString('id-ID', { maximumFractionDigits: 2 })} pcs/hari
+                                                {item.velocity.toLocaleString('id-ID', { maximumFractionDigits: 2 })} <span className="metric-unit">pcs/hari</span>
                                             </td>
                                             <td className="py-4.5 px-4 text-right text-white font-numeric font-semibold text-xs col-cycle">
-                                                {item.restockInterval.toLocaleString('id-ID')} hari
+                                                {item.restockInterval.toLocaleString('id-ID')} <span className="metric-unit">hari</span>
                                             </td>
                                         </>
                                     )}
                                     <td className="py-4.5 px-4 text-right text-[#cbd5e1] font-numeric font-semibold text-sm col-min-stock">
-                                        {item.minStock.toLocaleString('id-ID')} pcs
+                                        {item.minStock.toLocaleString('id-ID')} <span className="metric-unit">pcs</span>
                                     </td>
                                     <td className="py-4.5 px-4 text-right col-stockout">
                                         {item.currentStock <= 0 ? (
@@ -624,7 +591,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
                                         ) : (
                                             <div className="flex flex-col items-end">
                                                 <span className="font-semibold font-numeric text-sm text-[#cbd5e1]">
-                                                    {Math.round(item.daysToStockOut).toLocaleString('id-ID')} hari
+                                                    {Math.round(item.daysToStockOut).toLocaleString('id-ID')} <span className="metric-unit">hari</span>
                                                 </span>
                                             </div>
                                         )}
@@ -633,21 +600,26 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
                                         <div className="flex justify-center">
                                             {getStatusBadge(item)}
                                         </div>
+                                        <InventoryMismatchDetails
+                                            product={item.product}
+                                            size={item.size}
+                                            mismatches={mismatchesByItem.get(JSON.stringify([item.product, item.size])) ?? []}
+                                        />
                                     </td>
                                     <td className="py-4.5 px-4 text-right text-[#cbd5e1] font-semibold whitespace-nowrap">
-                                        {item.status === 'On Order' ? (
+                                        {item.isOnOrder ? (
                                             <div className="flex flex-col items-end">
                                                 <span className="font-bold text-[#38bdf8] font-numeric">
-                                                    {item.orderedQty.toLocaleString('id-ID')} pcs
+                                                    {item.orderedQty.toLocaleString('id-ID')} <span className="metric-unit">pcs</span>
                                                 </span>
                                                 <span className="text-[10px] text-[#94a3b8] font-medium">dipesan</span>
                                             </div>
                                         ) : (
-                                            `${item.suggestedOrderQty.toLocaleString('id-ID')} pcs`
+                                            <span className="font-numeric">{item.suggestedOrderQty.toLocaleString('id-ID')} <span className="metric-unit">pcs</span></span>
                                         )}
                                     </td>
                                     <td className="py-4.5 px-4 text-left text-[#cbd5e1] whitespace-nowrap">
-                                        {item.status === 'On Order' ? (
+                                        {item.isOnOrder ? (
                                             <button
                                                 type="button"
                                                 onClick={() => onNavigateToOrder?.(item.product, item.size)}
@@ -678,7 +650,7 @@ const ReplenishmentPlanner: React.FC<ReplenishmentPlannerProps> = ({
 
             {/* Pagination Controls */}
             {filteredItems.length > 0 && (
-                <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4 bg-[#1e293b]/30 p-4 rounded-2xl border border-[#334155]/40 text-xs text-[#94a3b8]">
+                <div className="planner-pagination mt-6 flex flex-col sm:flex-row justify-between items-center gap-4 bg-[#1e293b]/30 p-4 rounded-2xl border border-[#334155]/40 text-xs text-[#94a3b8]">
                     <div className="flex items-center gap-3">
                         <span>Tampilkan</span>
                         <select

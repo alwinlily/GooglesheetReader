@@ -13,7 +13,7 @@ export default function SummaryCards({ totalStock, totalIn, totalOut, totalRetur
             const change = baseline ? (card.value - baseline) / baseline * 100 : null;
             return <div className="kpi-card" key={card.key}>
                 <p className="kpi-label">{card.label}</p>
-                <p className="kpi-value">{card.value.toLocaleString('id-ID', { maximumFractionDigits: card.key === 'dailySales' ? 1 : 0 })} <span className="kpi-unit">{card.unit}</span></p>
+                <p className="kpi-value"><span className="kpi-number">{card.value.toLocaleString('id-ID', { maximumFractionDigits: card.key === 'dailySales' ? 1 : 0 })}</span> <span className="kpi-unit">{card.unit}</span></p>
                 <p className="kpi-comparison" title="Dibandingkan dengan rentang tanggal yang digeser satu bulan ke belakang.">
                     {change !== null ? (change > 0 ? '▲ ' : change < 0 ? '▼ ' : '— ') + Math.abs(change).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + '% vs bulan lalu' : 'Pembanding bulan lalu belum tersedia'}
                 </p>

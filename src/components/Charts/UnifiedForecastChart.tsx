@@ -26,36 +26,36 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
     const minStockValue = data[0]?.minStock || 0;
 
     return (
-        <div className="card chart-full" style={{ height: '500px' }}>
-            <div className="flex justify-between items-center mb-6">
+        <div className="card chart-full forecast-card">
+            <div className="forecast-header">
                 <div>
-                    <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em] mb-1">
-                        Unified Inventory Guide: {productName}
+                    <h3 className="section-heading mb-1">
+                        Unified inventory guide: {productName}
                     </h3>
                 </div>
 
                 <div className="flex items-center gap-4">
                     {/* Compact Metrics Row */}
-                    <div className="flex items-center gap-4 bg-[#0f172a] px-4 py-2 rounded-lg border border-[#334155]">
+                    <div className="forecast-metrics bg-[#0f172a] rounded-lg border border-[#334155]">
                         <div className="flex items-center gap-2 pr-4 border-r border-[#334155]">
                             <Target className="w-3.5 h-3.5 text-[#94a3b8]" />
                             <div>
-                                <div className="text-xs text-[#94a3b8] uppercase font-bold leading-tight">Target</div>
-                                <div className="text-sm font-extrabold text-white leading-tight">{data[0]?.target || 0}</div>
+                                <div className="forecast-metric-label text-[#94a3b8]">Target</div>
+                                <div className="forecast-metric-value text-white">{(data[0]?.target || 0).toLocaleString('id-ID')} <span className="metric-unit">pcs/hari</span></div>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 pr-4 border-r border-[#334155]">
                             <Box className="w-3.5 h-3.5 text-[#3b82f6]" />
                             <div>
-                                <div className="text-xs text-[#94a3b8] uppercase font-bold leading-tight">Stock</div>
-                                <div className="text-sm font-extrabold text-[#3b82f6] leading-tight">{data[0]?.stock || 0}</div>
+                                <div className="forecast-metric-label text-[#94a3b8]">Stock</div>
+                                <div className="forecast-metric-value text-[#60a5fa]">{(data[0]?.stock || 0).toLocaleString('id-ID')} <span className="metric-unit">pcs</span></div>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 pr-4 border-r border-[#334155]">
                             <History className="w-3.5 h-3.5 text-[#94a3b8]" />
                             <div>
-                                <div className="text-xs text-[#94a3b8] uppercase font-bold leading-tight">End</div>
-                                <div className="text-sm font-extrabold text-white opacity-60 leading-tight">{data[data.length - 1]?.stock || 0}</div>
+                                <div className="forecast-metric-label text-[#94a3b8]">End</div>
+                                <div className="forecast-metric-value text-[#cbd5e1]">{(data[data.length - 1]?.stock || 0).toLocaleString('id-ID')} <span className="metric-unit">pcs</span></div>
                             </div>
                         </div>
 
@@ -63,8 +63,8 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                             <div className="flex items-center gap-2">
                                 <CircleArrowDown className="w-3.5 h-3.5 text-[#ef4444]" />
                                 <div>
-                                    <div className="text-xs text-[#ef4444]/70 uppercase font-bold leading-tight">Stock Out</div>
-                                    <div className="text-sm font-extrabold text-[#ef4444] leading-tight">
+                                    <div className="forecast-metric-label text-[#f87171]">Stock out</div>
+                                    <div className="forecast-metric-date text-[#f87171]">
                                         {new Date(outOfStockPoint.date).toLocaleDateString('id-ID', { month: 'short', day: 'numeric' })}
                                     </div>
                                 </div>
@@ -73,8 +73,8 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                             <div className="flex items-center gap-2">
                                 <CirclePause className="w-3.5 h-3.5 text-[#64748b] opacity-40" />
                                 <div>
-                                    <div className="text-xs text-[#64748b]/60 uppercase font-bold leading-tight">Stock Out</div>
-                                    <div className="text-sm font-extrabold text-[#64748b]/40 leading-tight">Stable</div>
+                                    <div className="forecast-metric-label text-[#94a3b8]">Stock out</div>
+                                    <div className="forecast-metric-date text-[#cbd5e1]">Stable</div>
                                 </div>
                             </div>
                         )}
@@ -82,7 +82,7 @@ const UnifiedForecastChart: React.FC<UnifiedForecastChartProps> = ({ data, produ
                 </div>
             </div>
 
-            <ResponsiveContainer width="100%" height="80%">
+            <ResponsiveContainer width="100%" height={360}>
                 <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                     <defs>
                         <linearGradient id="colorStockUnified" x1="0" y1="0" x2="0" y2="1">

@@ -1,7 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { InventoryRecord } from "../types/inventory";
 import { parseGoogleSheetsData } from "../utils/dataParser";
 import { MOCK_SHEET_DATA, MOCK_MARAPTHON_SHEET_DATA, MOCK_MARAPTHON_MASTER_SHEET } from "../utils/mockData";
+
+import { INITIAL_INVENTORY_SYNC, getLatestInventoryTransactionDate, getWibDateKey, isCachedInventoryResponse, updateInventorySync } from '../utils/inventoryFreshness';
+import type { InventorySyncState } from '../utils/inventoryFreshness';
 
 export interface ProductMetadata {
     minStock: number;
@@ -9,12 +12,23 @@ export interface ProductMetadata {
 }
 
 export function useInventoryData(brand: "Kaos Dika" | "Marapthon") {
-    const [data, setData] = useState<InventoryRecord[]>([]);
-    const [productMetadata, setProductMetadata] = useState<Record<string, Record<string, ProductMetadata>>>({});
+    const [storedData, setData] = useState<InventoryRecord[]>([]);
+    const [storedMetadata, setProductMetadata] = useState<Record<string, Record<string, ProductMetadata>>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchData = async () => {
+    const [dataBrand, setDataBrand] = useState<typeof brand | null>(null);
+    const [sync, setSync] = useState<InventorySyncState>(INITIAL_INVENTORY_SYNC);
+    const [todayWib, setTodayWib] = useState(() => getWibDateKey(new Date()));
+    const request = useRef<AbortController | null>(null);
+    const matchesBrand = dataBrand === brand;
+    const data = useMemo(() => matchesBrand ? storedData : [], [matchesBrand, storedData]);
+    const productMetadata = matchesBrand ? storedMetadata : {};
+
+    const fetchData = useCallback(async () => {
+        request.current?.abort();
+        const controller = new AbortController();
+        request.current = controller;
         setLoading(true);
         setError(null);
         try {
@@ -36,11 +50,11 @@ export function useInventoryData(brand: "Kaos Dika" | "Marapthon") {
                     const minStockColIndex = headers.findIndex((h) => h === "min stock" || h === "min_stock");
                     const targetSalesColIndex = headers.findIndex((h) => h === "target sales daily" || h === "target sales" || h === "target_sales");
 
-                    masterValues.slice(1).forEach((row: any[]) => {
+                    masterValues.slice(1).forEach((row: unknown[]) => {
                         const productName = productColIndex !== -1 ? row[productColIndex] : null;
                         const size = sizeColIndex !== -1 ? (row[sizeColIndex] as string) : null;
-                        const minStock = minStockColIndex !== -1 ? parseFloat(row[minStockColIndex]) : 0;
-                        const targetSalesDaily = targetSalesColIndex !== -1 ? parseFloat(row[targetSalesColIndex]) : 0;
+                        const minStock = minStockColIndex !== -1 ? parseFloat(String(row[minStockColIndex])) : 0;
+                        const targetSalesDaily = targetSalesColIndex !== -1 ? parseFloat(String(row[targetSalesColIndex])) : 0;
 
                         if (productName && size) {
                             const trimmedProduct = String(productName).trim();
@@ -66,6 +80,8 @@ export function useInventoryData(brand: "Kaos Dika" | "Marapthon") {
                     });
                 }
                 setProductMetadata(metadataMap);
+                setDataBrand(brand);
+                setSync(previous => updateInventorySync(previous, 'mock', new Date()));
                 return;
             }
 
@@ -74,7 +90,7 @@ export function useInventoryData(brand: "Kaos Dika" | "Marapthon") {
 
             const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchGet?ranges=${encodeURIComponent(dailyRange)}&ranges=${encodeURIComponent(masterRange)}&key=${apiKey}`;
 
-            const response = await fetch(batchUrl);
+            const response = await fetch(batchUrl, { cache: 'no-store', signal: controller.signal });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -82,6 +98,7 @@ export function useInventoryData(brand: "Kaos Dika" | "Marapthon") {
             }
 
             const result = await response.json();
+            if (controller.signal.aborted) return;
 
             if (!result.valueRanges || result.valueRanges.length < 2) {
                 throw new Error("Required sheet data not found.");
@@ -90,27 +107,26 @@ export function useInventoryData(brand: "Kaos Dika" | "Marapthon") {
             const dailyValues = result.valueRanges[0].values;
             const masterValues = result.valueRanges[1].values;
 
-            if (!dailyValues) {
+            if (!Array.isArray(dailyValues) || !dailyValues.every(Array.isArray)
+                || (masterValues !== undefined && (!Array.isArray(masterValues) || !masterValues.every(Array.isArray)))) {
                 throw new Error("No data found in the Daily sheet.");
             }
 
             const parsed = parseGoogleSheetsData(dailyValues);
-            setData(parsed);
-
             // Parse Metadata dynamically from Master Sheet
             const metadataMap: Record<string, Record<string, ProductMetadata>> = {};
             if (masterValues && masterValues.length > 0) {
-                const headers = masterValues[0].map((h: any) => String(h).trim().toLowerCase());
+                const headers = masterValues[0].map((h: unknown) => String(h).trim().toLowerCase());
                 const productColIndex = headers.findIndex((h: string) => h === "item name" || h === "edisi" || h === "produk");
                 const sizeColIndex = headers.findIndex((h: string) => h === "size" || h === "ukuran");
                 const minStockColIndex = headers.findIndex((h: string) => h === "min stock" || h === "min_stock");
                 const targetSalesColIndex = headers.findIndex((h: string) => h === "target sales daily" || h === "target sales" || h === "target_sales");
 
-                masterValues.slice(1).forEach((row: any[]) => {
+                masterValues.slice(1).forEach((row: unknown[]) => {
                     const productName = productColIndex !== -1 ? row[productColIndex] : null;
                     const size = sizeColIndex !== -1 ? (row[sizeColIndex] as string) : null;
-                    const minStock = minStockColIndex !== -1 ? parseFloat(row[minStockColIndex]) : 0;
-                    const targetSalesDaily = targetSalesColIndex !== -1 ? parseFloat(row[targetSalesColIndex]) : 0;
+                    const minStock = minStockColIndex !== -1 ? parseFloat(String(row[minStockColIndex])) : 0;
+                    const targetSalesDaily = targetSalesColIndex !== -1 ? parseFloat(String(row[targetSalesColIndex])) : 0;
 
                     if (productName && size) {
                         const trimmedProduct = String(productName).trim();
@@ -125,18 +141,40 @@ export function useInventoryData(brand: "Kaos Dika" | "Marapthon") {
                     }
                 });
             }
+            setData(parsed);
             setProductMetadata(metadataMap);
-        } catch (err: any) {
+            setDataBrand(brand);
+            setSync(previous => updateInventorySync(previous,
+                isCachedInventoryResponse(response.headers) ? 'cached' : 'live', new Date()));
+        } catch (err: unknown) {
+            if (controller.signal.aborted) return;
+            setSync(previous => updateInventorySync(previous, 'failure', new Date()));
             console.error("Fetch error:", err);
-            setError(err.message || "Failed to fetch data");
+            setError(err instanceof Error ? err.message : "Failed to fetch data");
         } finally {
-            setLoading(false);
+            if (!controller.signal.aborted) setLoading(false);
         }
-    };
+    }, [brand]);
 
     useEffect(() => {
-        fetchData();
-    }, [brand]);
+        setDataBrand(null);
+        setData([]);
+        setProductMetadata({});
+        setSync(INITIAL_INVENTORY_SYNC);
+        void fetchData();
+        return () => { request.current?.abort(); };
+    }, [brand, fetchData]);
+
+    // Keep the nonfuture cutoff correct when this dashboard stays open across WIB midnight.
+    useEffect(() => {
+        const timer = window.setInterval(() => setTodayWib(getWibDateKey(new Date())), 30_000);
+        return () => window.clearInterval(timer);
+    }, []);
+
+    const latestTransactionDate = useMemo(
+        () => getLatestInventoryTransactionDate(data, new Date(`${todayWib}T12:00:00+07:00`)),
+        [data, todayWib],
+    );
 
     const products = useMemo(() => {
         return Array.from(new Set(data.map((r) => r.product)));
@@ -148,5 +186,11 @@ export function useInventoryData(brand: "Kaos Dika" | "Marapthon") {
         return { min: dates[0], max: dates[dates.length - 1] };
     }, [data]);
 
-    return { data, productMetadata, loading, error, products, dateRange, refresh: fetchData };
+    return {
+        data, productMetadata, loading: !matchesBrand && !error ? true : loading,
+        error, products, dateRange, refresh: fetchData,
+        lastSyncedAt: matchesBrand ? sync.lastSyncedAt : null,
+        latestTransactionDate,
+        source: matchesBrand ? sync.source : 'none' as const,
+    };
 }

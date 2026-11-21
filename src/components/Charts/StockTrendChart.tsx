@@ -8,6 +8,7 @@ import {
     Tooltip,
     ResponsiveContainer,
     Legend,
+    LabelList,
     ReferenceLine
 } from 'recharts';
 import {
@@ -69,6 +70,7 @@ interface ComparisonTooltipProps {
     active?: boolean;
     payload?: TooltipPayloadEntry[];
     sizes: string[];
+    item?: TrendDataPoint;
 }
 
 const StandardTooltip = ({ active, payload, label }: TooltipProps) => {
@@ -112,85 +114,58 @@ const StandardTooltip = ({ active, payload, label }: TooltipProps) => {
     return null;
 };
 
-const ComparisonTooltip = ({ active, payload, sizes }: ComparisonTooltipProps) => {
-    if (active && payload && payload.length) {
-        const item = payload[0]?.payload;
-        if (!item) return null;
+// Undefined is an observation gap, not a recorded zero.
+const comparisonValue = (value: string | number | undefined) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+const formatComparisonValue = (value: string | number | undefined) => {
+    const number = comparisonValue(value);
+    return number === undefined ? 'Tidak ada data' : `${number.toLocaleString('id-ID')} pcs`;
+};
 
-        const currentTotal = item.total ?? 0;
-        const prevTotal = item.prevTotal ?? 0;
-        const diff = currentTotal - prevTotal;
-        const pctChange = prevTotal > 0 ? (diff / prevTotal) * 100 : (currentTotal > 0 ? 100 : 0);
-
-        return (
-            <div className="bg-[#0f172a] border border-[#334155] p-3.5 rounded-xl shadow-2xl min-w-[280px] max-w-[340px] text-xs">
-                {/* Header: Date Comparison */}
-                <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#334155]">
-                    <div className="flex flex-col">
-                        <span className="text-xs text-[#38bdf8] uppercase font-bold tracking-wider">Periode Ini</span>
-                        <span className="text-white font-bold text-xs">{formatFullDate(item.date)}</span>
-                    </div>
-                    <div className="text-center px-1.5 py-0.5 rounded bg-[#1e293b] border border-[#334155]">
-                        <span className="text-[#94a3b8] text-xs font-bold">vs</span>
-                    </div>
-                    <div className="flex flex-col text-right">
-                        <span className="text-xs text-[#94a3b8] uppercase font-bold tracking-wider">1 Bulan Lalu</span>
-                        <span className="text-[#cbd5e1] font-bold text-xs">{formatFullDate(item.prevDate)}</span>
-                    </div>
+const ComparisonTooltip = ({ active, payload, sizes, item: selectedItem }: ComparisonTooltipProps) => {
+    const item = selectedItem ?? payload?.[0]?.payload;
+    if (!active || !item) return null;
+    const current = comparisonValue(item.total);
+    const previous = comparisonValue(item.prevTotal);
+    const diff = current !== undefined && previous !== undefined ? current - previous : undefined;
+    const pct = diff !== undefined && previous !== undefined
+        ? (previous > 0 ? diff / previous * 100 : (current! > 0 ? 100 : 0))
+        : undefined;
+    return (
+        <div className="bg-[#0f172a] border border-[#334155] p-3 rounded-xl shadow-xl text-xs w-full max-w-[340px] tabular-nums">
+            <div className="grid grid-cols-2 gap-3 border-b border-[#334155] pb-2 mb-2">
+                <div>
+                    <p className="text-[#3b82f6] font-semibold">Bulan ini</p>
+                    <p className="text-white">{formatFullDate(item.date)}</p>
+                    <p className="text-[#3b82f6] font-semibold mt-1">{formatComparisonValue(item.total)}</p>
                 </div>
-
-                {/* Total Comparison Box */}
-                <div className="bg-[#1e293b]/70 p-2.5 rounded-lg border border-[#334155]/60 mb-2.5 flex items-center justify-between">
-                    <div>
-                        <div className="text-xs text-[#94a3b8] uppercase font-semibold">Total Penjualan</div>
-                        <div className="flex items-baseline gap-2 mt-0.5">
-                            <span className="text-base font-extrabold text-[#38bdf8]">{currentTotal.toLocaleString('id-ID')} pcs</span>
-                            <span className="text-xs text-[#cbd5e1] font-mono">({prevTotal.toLocaleString('id-ID')} pcs)</span>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <div className="text-xs text-[#94a3b8] uppercase font-semibold">Pertumbuhan</div>
-                        <div className={`text-xs font-extrabold mt-0.5 flex items-center justify-end gap-1 ${
-                            diff > 0 ? 'text-[#10b981]' : diff < 0 ? 'text-[#ef4444]' : 'text-[#94a3b8]'
-                        }`}>
-                            {diff > 0 ? <TrendingUp className="w-3 h-3" /> : diff < 0 ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
-                            <span>{diff > 0 ? `+${diff.toLocaleString('id-ID')}` : diff.toLocaleString('id-ID')} ({diff > 0 ? '+' : ''}{pctChange.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%)</span>
-                        </div>
-                    </div>
+                <div className="text-right">
+                    <p className="text-[#94a3b8] font-semibold">1 bulan lalu</p>
+                    <p className="text-[#cbd5e1]">{item.prevDate ? formatFullDate(item.prevDate) : 'Tidak ada tanggal'}</p>
+                    <p className="text-[#cbd5e1] font-semibold mt-1">{formatComparisonValue(item.prevTotal)}</p>
                 </div>
-
-                {/* Size breakdown if 'All' sizes selected */}
-                {sizes.length > 1 && (
-                    <div className="space-y-1">
-                        <div className="text-xs uppercase font-bold text-[#94a3b8] tracking-wider mb-1 flex justify-between">
-                            <span>Ukuran</span>
-                            <span className="text-right">Bulan Ini (Bln Lalu) [Selisih]</span>
-                        </div>
-                        {['S', 'M', 'L', 'XL', 'XXL'].map(s => {
-                            const cur = Number(item[s] ?? 0);
-                            const prev = Number(item[`prev_${s}`] ?? 0);
-                            const sDiff = cur - prev;
-                            return (
-                                <div key={s} className="flex items-center justify-between py-0.5 px-1.5 rounded hover:bg-[#1e293b]/50">
-                                    <span className="font-bold text-[#cbd5e1]">{s}</span>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[#38bdf8] font-mono font-semibold">{cur}</span>
-                                        <span className="text-[#94a3b8] text-xs font-mono">({prev})</span>
-                                        <span className={`text-xs font-mono font-bold w-12 text-right ${
-                                            sDiff > 0 ? 'text-[#10b981]' : sDiff < 0 ? 'text-[#ef4444]' : 'text-[#64748b]'
-                                        }`}>
-                                            {sDiff > 0 ? `+${sDiff}` : sDiff}
-                                        </span>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
             </div>
-        );
-    }
-    return null;
+            <p className="text-[#cbd5e1]">Selisih: {diff === undefined ? 'Tidak ada data' : `${diff > 0 ? '+' : ''}${diff.toLocaleString('id-ID')} pcs`}
+                {pct !== undefined && ` (${pct > 0 ? '+' : ''}${pct.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%)`}
+            </p>
+            {sizes.length > 1 && <div className="mt-2 space-y-1">
+                {sizes.map(size => {
+                    const currentSize = comparisonValue(item[size]);
+                    const previousSize = comparisonValue(item[`prev_${size}`]);
+                    const sizeDiff = currentSize !== undefined && previousSize !== undefined
+                        ? currentSize - previousSize : undefined;
+                    return <div key={size} className="grid grid-cols-[2rem_1fr_1fr] gap-x-2">
+                        <span className="text-[#cbd5e1] font-semibold">{size}</span>
+                        <span className="text-[#3b82f6] text-right">{formatComparisonValue(item[size])}</span>
+                        <span className="text-[#94a3b8] text-right">{formatComparisonValue(item[`prev_${size}`])}</span>
+                        <span className="col-span-3 text-right text-[#94a3b8]">
+                            Selisih {size}: {sizeDiff === undefined ? 'Tidak ada data' : `${sizeDiff > 0 ? '+' : ''}${sizeDiff.toLocaleString('id-ID')} pcs`}
+                        </span>
+                    </div>;
+                })}
+            </div>}
+        </div>
+    );
 };
 
 const StockTrendChart: React.FC<StockTrendChartProps> = ({
@@ -207,9 +182,11 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
     const [hiddenSizes, setHiddenSizes] = useState<Record<string, boolean>>({});
     const [compareLastMonth, setCompareLastMonth] = useState(false);
     const [showDayToDayTable, setShowDayToDayTable] = useState(false);
+    const [chartWidth, setChartWidth] = useState(0);
+    const [selectedDate, setSelectedDate] = useState<string>();
     const [displayMode, setDisplayMode] = useState<'total' | 'breakdown'>('total');
 
-    const handleLegendClick = (e: any) => {
+    const handleLegendClick = (e: { dataKey?: unknown }) => {
         if (!e?.dataKey) return;
         const key = String(e.dataKey);
         setHiddenSizes(prev => ({
@@ -272,6 +249,21 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
     }, [data]);
 
     const isComparing = compareLastMonth && metric === 'Sales';
+    const selectedPoint = data.find(point => point.date === selectedDate);
+    const finalPoint = data[data.length - 1];
+    const comparisonRange = data.flatMap(point => [point.total, point.prevTotal])
+        .filter((value): value is number => comparisonValue(value) !== undefined);
+    const range = Math.max(...comparisonRange, 0) - Math.min(...comparisonRange, 0);
+    // Reserve a label gutter only on wide total charts. Suppress nearby endpoints
+    // conservatively rather than displacing a label away from its actual value.
+    const canLabelEnds = isComparing && (displayMode === 'total' || sizes.length === 1)
+        && chartWidth >= 640 && finalPoint
+        && (hiddenSizes.total || hiddenSizes.prevTotal
+            || comparisonValue(finalPoint.total) === undefined || comparisonValue(finalPoint.prevTotal) === undefined
+            || Math.abs(finalPoint.total! - finalPoint.prevTotal!) > range * 0.25);
+    const endLabel = (name: string, key: 'total' | 'prevTotal') => (_entry: { payload: unknown }, index: number) =>
+        index === data.length - 1 && comparisonValue(finalPoint?.[key]) !== undefined ? name : '';
+
 
     return (
         <div className="card chart-full" style={{ minHeight: '440px', height: 'auto' }}>
@@ -281,8 +273,8 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                     {isComparing ? (
                         <div className="flex flex-col gap-0.5">
                             <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="text-white text-sm font-bold uppercase tracking-wider">
-                                    Perbandingan Penjualan MoM (Day-to-Day)
+                                <h3 className="text-white text-[18px] sm:text-[20px] font-semibold">
+                                    Perbandingan penjualan MoM (day-to-day)
                                 </h3>
                                 <span className="px-2 py-0.5 rounded text-xs font-extrabold uppercase bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30 flex items-center gap-1.5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span>
@@ -296,8 +288,8 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                             </p>
                         </div>
                     ) : (
-                        <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em]">
-                            {metric} Trends
+                        <h3 className="text-[#f1f5f9] text-[18px] sm:text-[20px] font-semibold">
+                            {metric} trends
                         </h3>
                     )}
                 </div>
@@ -457,8 +449,15 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
 
             {/* Recharts Chart Area */}
             <div style={{ height: '350px', width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data}>
+                <ResponsiveContainer width="100%" height="100%" onResize={width => setChartWidth(width)}>
+                    <LineChart data={data}
+                        margin={isComparing ? { top: 16, right: canLabelEnds ? 112 : 8, bottom: 4, left: 0 } : undefined}
+                        onClick={state => {
+                            if (!isComparing || state.activeIndex == null) return;
+                            const point = data[Number(state.activeIndex)];
+                            if (point) setSelectedDate(point.date);
+                        }}
+                    >
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                         <XAxis
                             dataKey="date"
@@ -470,6 +469,7 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                         />
                         <YAxis stroke="#64748b" fontSize={12} tickFormatter={(value) => Number(value).toLocaleString('id-ID')} />
                         <Tooltip
+                            wrapperStyle={isComparing ? { maxWidth: 'min(340px, calc(100vw - 48px))', pointerEvents: 'none' } : undefined}
                             content={
                                 isComparing ? (
                                     <ComparisonTooltip sizes={sizes} />
@@ -503,27 +503,33 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                                     type="monotone"
                                     dataKey="total"
                                     name={sizes.length === 1 ? `${sizes[0]} (Bulan Ini)` : "Total Sales (Bulan Ini)"}
-                                    stroke="#38bdf8"
+                                    stroke="#3b82f6"
                                     strokeWidth={3}
-                                    dot={false}
+                                    dot={{ r: 2.5, fill: '#3b82f6', strokeWidth: 0 }}
                                     activeDot={{ r: 4 }}
-                                    connectNulls={true}
+                                    connectNulls={false}
+                                    isAnimationActive={false}
                                     hide={!!hiddenSizes['total']}
-                                />}
+                                >
+                                    {canLabelEnds && <LabelList position="right" offset={10} fill="#3b82f6" fontSize={12} fontWeight={600} valueAccessor={endLabel('Bulan ini', 'total')} />}
+                                </Line>}
 
                                 {/* 2. Comparison Benchmark Line: 1 Bulan Lalu */}
                                 {(displayMode === 'total' || sizes.length === 1) && <Line
                                     type="monotone"
                                     dataKey="prevTotal"
                                     name={sizes.length === 1 ? `${sizes[0]} (1 Bulan Lalu)` : "Total Sales (1 Bulan Lalu)"}
-                                    stroke="#f59e0b"
+                                    stroke="#94a3b8"
                                     strokeWidth={2.5}
                                     strokeDasharray="5 5"
-                                    dot={false}
+                                    dot={{ r: 2.5, fill: '#94a3b8', strokeWidth: 0 }}
                                     activeDot={{ r: 4 }}
-                                    connectNulls={true}
+                                    connectNulls={false}
+                                    isAnimationActive={false}
                                     hide={!!hiddenSizes['prevTotal']}
-                                />}
+                                >
+                                    {canLabelEnds && <LabelList position="right" offset={10} fill="#94a3b8" fontSize={12} fontWeight={600} valueAccessor={endLabel('1 bulan lalu', 'prevTotal')} />}
+                                </Line>}
 
                                 {/* 3. Breakdown size lines if requested */}
                                 {sizes.length > 1 && displayMode === 'breakdown' && (
@@ -598,6 +604,21 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
                 </ResponsiveContainer>
             </div>
 
+            {isComparing && data.length > 0 && <div className="mt-3 space-y-2">
+                <label className="flex items-center flex-wrap gap-2 text-xs text-[#94a3b8]">
+                    Ketuk grafik atau pilih tanggal
+                    <select aria-label="Tanggal perbandingan" value={selectedPoint?.date ?? ''}
+                        onChange={event => setSelectedDate(event.target.value)}
+                        className="min-h-11 rounded-lg border border-[#334155] bg-[#0f172a] px-3 text-[#f1f5f9]">
+                        <option value="">Pilih tanggal</option>
+                        {data.map(point => <option key={point.date} value={point.date}>{formatFullDate(point.date)}</option>)}
+                    </select>
+                </label>
+                {selectedPoint && <div role="status" aria-live="polite" aria-label="Detail perbandingan tanggal">
+                    <ComparisonTooltip active item={selectedPoint} sizes={sizes} />
+                </div>}
+            </div>}
+
             {/* Total Period Aggregate footer (when not in comparison mode) */}
             {!isComparing && totalAggregate !== undefined && (
                 <div className="mt-4 pt-4 border-t border-[#334155] flex justify-between items-center transition-all duration-300">
@@ -611,11 +632,11 @@ const StockTrendChart: React.FC<StockTrendChartProps> = ({
             {/* Expandable Day-to-Day Comparison Table */}
             {isComparing && showDayToDayTable && (
                 <div className="mt-4 pt-4 border-t border-[#334155]/60 animate-in fade-in duration-200">
-                    <div className="flex justify-between items-center mb-3">
+                    <div className="flex flex-wrap gap-2 justify-between items-center mb-3">
                         <div className="flex items-center gap-2">
                             <TableIcon className="w-4 h-4 text-[#94a3b8]" />
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-[#f1f5f9]">
-                                Rincian Penjualan Harian (Day-to-Day)
+                            <h4 className="text-[18px] sm:text-[20px] font-semibold text-[#f1f5f9]">
+                                Rincian penjualan harian (day-to-day)
                             </h4>
                         </div>
                         <span className="text-xs text-[#94a3b8] font-mono">{data.length} hari perbandingan</span>

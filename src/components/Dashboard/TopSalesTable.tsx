@@ -25,10 +25,10 @@ const TopSalesTable: React.FC<TopSalesTableProps> = ({ data }) => {
     };
 
     return (
-        <div className="card h-full">
+        <div className="card h-full top-sales-card">
             <div className="flex items-center gap-2.5 mb-6">
                 <Trophy className="w-5 h-5 text-[#94a3b8]" />
-                <h3 className="text-[#64748b] text-[0.8rem] font-bold uppercase tracking-[0.1em]">Inventory Status Summary</h3>
+                <h3 className="section-heading">Inventory status summary</h3>
             </div>
 
             <div className="overflow-x-auto rounded-lg border border-[#334155]/40 bg-[#0f172a]/20">
@@ -47,7 +47,7 @@ const TopSalesTable: React.FC<TopSalesTableProps> = ({ data }) => {
                             <th className="py-4 px-4 text-right font-bold">
                                 <div className="flex items-center justify-end gap-1.5">
                                     <TriangleAlert className="w-3.5 h-3.5" />
-                                    <span>Stock Out</span>
+                                    <span>Stock out</span>
                                 </div>
                             </th>
                         </tr>
